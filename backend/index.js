@@ -1,8 +1,4 @@
-import buffer from "node:buffer";
-if (!buffer.SlowBuffer) {
-  buffer.SlowBuffer = class SlowBuffer extends buffer.Buffer {};
-}
-
+import "./polyfill.js";
 import express from "express";
 import dotenv from "dotenv";
 import connectDB from "./config/db.js";

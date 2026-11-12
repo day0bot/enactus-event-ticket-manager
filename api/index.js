@@ -1,9 +1,7 @@
-import buffer from "node:buffer";
-// Polyfill SlowBuffer for Node 22/24/26 compatibility with jsonwebtoken
-if (!buffer.SlowBuffer) {
-  buffer.SlowBuffer = class SlowBuffer extends buffer.Buffer {};
-}
+import "./polyfill.js";
 
-import app from "../backend/index.js";
+// Dynamically import backend after polyfill is guaranteed to be in memory
+const appModule = await import("../backend/index.js");
+const app = appModule.default;
 
 export default app;

@@ -1,3 +1,4 @@
+import "../polyfill.js";
 import Booking from "../models/BookingModel.js";
 import Event from "../models/EventModel.js";
 import userModel from "../models/UserModel.js";

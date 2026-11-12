@@ -9,17 +9,30 @@ try {
   // Ignore if custom DNS cannot be applied
 }
 
+let isConnected = false;
+
 const connectDB = async () => {
+  if (isConnected || mongoose.connection.readyState === 1) {
+    return mongoose.connection;
+  }
+
   try {
     const uri = process.env.MONGO_URI;
     if (!uri) {
       throw new Error("MONGO_URI is not defined in the environment variables");
     }
-    const conn = await mongoose.connect(uri);
+    const conn = await mongoose.connect(uri, {
+      serverSelectionTimeoutMS: 8000,
+    });
+    isConnected = true;
     console.log(`MongoDB Connected: ${conn.connection.host}`);
+    return conn;
   } catch (error) {
-    console.error(`Error: ${error.message}`);
-    process.exit(1);
+    console.error(`MongoDB Connection Error: ${error.message}`);
+    if (!process.env.VERCEL) {
+      process.exit(1);
+    }
+    throw error;
   }
 };
 

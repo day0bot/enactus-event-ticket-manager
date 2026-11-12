@@ -2,7 +2,9 @@
   "type": "module",
   "scripts": {
     "dev": "nodemon backend/index.js",
-    "seed": "node backend/seed.js"
+    "seed": "node backend/seed.js",
+    "build": "npm run build --prefix frontend",
+    "start": "node backend/index.js"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",

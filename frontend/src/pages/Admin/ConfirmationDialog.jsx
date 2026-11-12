@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import "../../stylesheets/ConfirmationDialog.css";
+import { API_BASE_URL } from "../../config/axios";
 
 const ConfirmationDialog = () => {
   const { userId } = useParams();
@@ -19,7 +20,7 @@ const ConfirmationDialog = () => {
       const fetchUser = async () => {
         try {
           const response = await axios.get(
-            `http://localhost:8000/api/v1/users/${userId}`,
+            `${API_BASE_URL}/users/${userId}`,
             {
               withCredentials: true,
             }
@@ -43,7 +44,7 @@ const ConfirmationDialog = () => {
 
     try {
       // Make API call to delete the user
-      await axios.delete(`http://localhost:8000/api/v1/users/${userId}`, {
+      await axios.delete(`${API_BASE_URL}/users/${userId}`, {
         withCredentials: true,
       });
 

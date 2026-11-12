@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import axios from "axios";
 import "../../stylesheets/DeletEvent.css";
+import { API_BASE_URL } from "../../config/axios";
 
 const DeleteEvent = ({ event, onClose, onDeleted }) => {
   const [deleting, setDeleting] = useState(false);
@@ -11,7 +12,7 @@ const DeleteEvent = ({ event, onClose, onDeleted }) => {
     setError(null);
 
     try {
-      await axios.delete(`http://localhost:8000/api/v1/events/${event._id}`, {
+      await axios.delete(`${API_BASE_URL}/events/${event._id}`, {
         withCredentials: true,
       });
 

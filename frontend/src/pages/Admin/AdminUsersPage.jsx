@@ -3,6 +3,7 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import "../../stylesheets/AdminUsersPage.css";
 import { exportToCsv } from "../../utils/csvExport";
+import { API_BASE_URL } from "../../config/axios";
 
 const AdminUsersPage = () => {
   const [users, setUsers] = useState([]);
@@ -19,7 +20,7 @@ const AdminUsersPage = () => {
     const fetchUsers = async () => {
       try {
         setLoading(true);
-        const response = await axios.get("http://localhost:8000/api/v1/users", {
+        const response = await axios.get(`${API_BASE_URL}/users`, {
           withCredentials: true,
         });
         setUsers(response.data);

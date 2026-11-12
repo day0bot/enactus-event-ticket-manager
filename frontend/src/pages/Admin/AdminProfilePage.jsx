@@ -3,6 +3,7 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import "../../stylesheets/profile.css";
 import { format } from "date-fns";
+import { API_BASE_URL } from "../../config/axios";
 
 function AdminProfilePage() {
   const [user, setUser] = useState(null);
@@ -13,7 +14,7 @@ function AdminProfilePage() {
     const fetchUserProfile = async () => {
       try {
         const response = await axios.get(
-          "http://localhost:8000/api/v1/users/profile",
+          `${API_BASE_URL}/users/profile`,
           {
             withCredentials: true,
           }
@@ -40,7 +41,7 @@ function AdminProfilePage() {
   const handleLogout = async () => {
     try {
       await axios.post(
-        "http://localhost:8000/api/v1/users/logout",
+        `${API_BASE_URL}/users/logout`,
         {},
         {
           withCredentials: true,

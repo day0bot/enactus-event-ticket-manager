@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import "../../stylesheets/UserRoleUpdate.css";
+import { API_BASE_URL } from "../../config/axios";
 
 const UserRoleUpdate = () => {
   const { userId } = useParams();
@@ -21,7 +22,7 @@ const UserRoleUpdate = () => {
       const fetchUser = async () => {
         try {
           const response = await axios.get(
-            `http://localhost:8000/api/v1/users/${userId}`,
+            `${API_BASE_URL}/users/${userId}`,
             {
               withCredentials: true,
             }
@@ -61,7 +62,7 @@ const UserRoleUpdate = () => {
 
     try {
       const response = await axios.put(
-        `http://localhost:8000/api/v1/users/${userId}`,
+        `${API_BASE_URL}/users/${userId}`,
         { role: selectedRole },
         { withCredentials: true }
       );

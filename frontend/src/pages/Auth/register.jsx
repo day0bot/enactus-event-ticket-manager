@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "../../stylesheets/register.css"; // Fixed path assuming "styles" is your folder name
 import axios from "axios";
+import { API_BASE_URL } from "../../config/axios";
 
 function Register() {
   // State variables
@@ -53,7 +54,7 @@ function Register() {
     try {
       // Fixed API endpoint to match backend routes
       const response = await axios.post(
-        "http://localhost:8000/api/v1/auth/register",
+        `${API_BASE_URL}/auth/register`,
         {
           name,
           email,

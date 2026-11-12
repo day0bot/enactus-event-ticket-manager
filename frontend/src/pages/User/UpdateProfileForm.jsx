@@ -6,6 +6,7 @@ import getCroppedImg from "../../utils/cropImage";
 import imageCompression from "browser-image-compression";
 import "../../stylesheets/profile.css";
 import { Button } from "@mui/material";
+import { API_BASE_URL } from "../../config/axios";
 
 const UpdateProfileForm = () => {
     const [formData, setFormData] = useState({
@@ -25,7 +26,7 @@ const UpdateProfileForm = () => {
     useEffect(() => {
         const fetchUserProfile = async () => {
             try {
-                const response = await axios.get("http://localhost:8000/api/v1/users/profile", {
+                const response = await axios.get(`${API_BASE_URL}/users/profile`, {
                     withCredentials: true,
                 });
                 setFormData({
@@ -78,7 +79,7 @@ const UpdateProfileForm = () => {
             uploadData.append("profilePicture", compressedImage);
 
             const response = await axios.post(
-                "http://localhost:8000/api/v1/users/upload-profile-picture",
+                `${API_BASE_URL}/users/upload-profile-picture`,
                 uploadData,
                 {
                     withCredentials: true,
@@ -105,7 +106,7 @@ const UpdateProfileForm = () => {
         e.preventDefault();
         try {
             await axios.put(
-                "http://localhost:8000/api/v1/users/profile",
+                `${API_BASE_URL}/users/profile`,
                 formData,
                 { withCredentials: true }
             );

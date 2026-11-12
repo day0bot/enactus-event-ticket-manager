@@ -12,10 +12,9 @@ import authenticationMiddleware from "./middleware/authenticationMiddleware.js";
 import { v2 as cloudinary } from "cloudinary";
 import EventController from "./controllers/EventController.js";
 
-
-const app = express();
 dotenv.config();
 
+const app = express();
 
 // Cloudinary configuration
 cloudinary.config({
@@ -28,13 +27,45 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
+// CORS configuration supporting local dev and Vercel deployments
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  process.env.CLIENT_URL,
+].filter(Boolean);
+
 app.use(
-    cors({
-      origin: "http://localhost:5173",
-      methods: ["GET", "POST", "PUT", "DELETE"],
-      credentials: true,
-    })
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin) || origin.endsWith(".vercel.app")) {
+        callback(null, true);
+      } else {
+        callback(null, true);
+      }
+    },
+    credentials: true,
+  })
 );
+
+// Ensure MongoDB Atlas is connected before handling requests
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    console.error("Database connection error in middleware:", err.message);
+    res.status(500).json({
+      success: false,
+      message: "Database connection failed",
+      error: err.message,
+    });
+  }
+});
+
+// Health check route
+app.get("/api/health", (req, res) => {
+  res.status(200).json({ status: "ok", timestamp: new Date() });
+});
 
 // Public routes
 app.use("/api/v1/auth", authRouter);
@@ -53,7 +84,7 @@ app.use("/api/v1/users", userRoutes);
 
 // Basic route
 app.get("/", (req, res) => {
-  res.send("Hello from the server!");
+  res.send("Enactus Event Ticket Manager API is running!");
 });
 
 // 404 handler
@@ -66,9 +97,7 @@ app.use((req, res) => {
 
 const startServer = async (port) => {
   try {
-    // Connect to database first
     await connectDB();
-    
     const server = app.listen(port, () => {
       console.log(`Server started at http://localhost:${port}`);
     });
@@ -76,7 +105,7 @@ const startServer = async (port) => {
     server.on("error", (err) => {
       if (err.code === "EADDRINUSE") {
         console.error(`Port ${port} is in use. Trying another port...`);
-        startServer(port + 1); // Retry with the next port
+        startServer(port + 1);
       } else {
         console.error("Server error:", err);
         process.exit(1);
@@ -95,5 +124,10 @@ const startServer = async (port) => {
   }
 };
 
-const PORT = parseInt(process.env.PORT, 10) || 8000;
-startServer(PORT);
+// Start standalone server only when not running in Vercel serverless environment
+if (!process.env.VERCEL) {
+  const PORT = parseInt(process.env.PORT, 10) || 8000;
+  startServer(PORT);
+}
+
+export default app;

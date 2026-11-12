@@ -1,14 +1,16 @@
 import axios from 'axios';
 
+export const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
+
 // Create a public instance for non-authenticated routes
 export const publicAxios = axios.create({
-    baseURL: 'http://localhost:8000/api/v1',
+    baseURL: API_BASE_URL,
     withCredentials: true
 });
 
 // Create an authenticated instance
 const authAxios = axios.create({
-    baseURL: 'http://localhost:8000/api/v1',
+    baseURL: API_BASE_URL,
     withCredentials: true
 });
 
@@ -39,4 +41,4 @@ authAxios.interceptors.response.use(
     }
 );
 
-export default authAxios; 
+export default authAxios;

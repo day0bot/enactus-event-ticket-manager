@@ -215,16 +215,34 @@ const EventList = () => {
                       />
                     </Box>
                   </CardContent>
-                  <CardActions sx={{ padding: "0 16px 16px 16px" }}>
+                  <CardActions sx={{ padding: "0 16px 16px 16px", display: "flex", gap: 1 }}>
                     <Button
                       variant="contained"
-                      color="primary"
-                      size="medium"
-                      fullWidth
+                      sx={{
+                        backgroundColor: "#f59e0b",
+                        color: "#0a0a0a",
+                        fontWeight: "bold",
+                        "&:hover": { backgroundColor: "#d97706" },
+                        flex: 1
+                      }}
+                      size="small"
+                      onClick={() => navigate(`/tickets?eventId=${event._id}&action=generate`)}
+                    >
+                      Issue Tickets
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      sx={{
+                        borderColor: "rgba(245, 158, 11, 0.4)",
+                        color: "#f59e0b",
+                        "&:hover": { borderColor: "#f59e0b" },
+                        flex: 1
+                      }}
+                      size="small"
                       endIcon={<ArrowForwardIcon />}
                       onClick={() => handleViewDetails(event._id)}
                     >
-                      View Details
+                      Details
                     </Button>
                   </CardActions>
                 </Card>

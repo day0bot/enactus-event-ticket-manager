@@ -49,7 +49,8 @@ function Navbar() {
 
   const getNavLinks = () => {
     const commonLinks = [
-      { to: "/", text: "Home" },
+      { to: "/", text: "Dashboard" },
+      { to: "/tickets", text: "Ticket Manager" },
       { to: "/events", text: "Events" },
     ];
 
@@ -69,10 +70,6 @@ function Navbar() {
           { to: "/my-events/new", text: "Create Event" },
         ];
       case "Standard User":
-        return [
-          ...commonLinks,
-          { to: "/bookings", text: "My Bookings" },
-        ];
       default:
         return commonLinks;
     }

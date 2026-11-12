@@ -7,6 +7,7 @@ import connectDB from './config/db.js';
 import User from './models/UserModel.js';
 import EventModel from './models/EventModel.js';
 import Booking from './models/BookingModel.js';
+import Ticket from './models/TicketModel.js';
 
 const seedDatabase = async () => {
   try {
@@ -15,6 +16,7 @@ const seedDatabase = async () => {
 
     // Clear existing collections to ensure fresh, clean data
     await Booking.deleteMany({});
+    await Ticket.deleteMany({});
     await EventModel.deleteMany({});
     await User.deleteMany({});
     console.log('Cleared existing users, events, and bookings.');
@@ -186,6 +188,47 @@ const seedDatabase = async () => {
     ]);
 
     console.log(`Created ${bookings.length} sample bookings for analytics and ticket management.`);
+
+    // 4. Seed Generated Tickets
+    const tickets = await Ticket.insertMany([
+      {
+        ticketCode: 'ENACTUS-EXP-001',
+        event: events[0]._id,
+        recipientName: 'Alex Johnson',
+        recipientEmail: 'alex.johnson@enactus.org',
+        ticketType: 'Delegate',
+        status: 'Valid',
+        issuedBy: organizer1._id,
+      },
+      {
+        ticketCode: 'ENACTUS-EXP-002',
+        event: events[0]._id,
+        recipientName: 'Maya Patel',
+        recipientEmail: 'maya.patel@enactus.org',
+        ticketType: 'VIP',
+        status: 'Valid',
+        issuedBy: organizer1._id,
+      },
+      {
+        ticketCode: 'ENACTUS-HACK-010',
+        event: events[1]._id,
+        recipientName: 'Lucas Dubois',
+        recipientEmail: 'lucas.d@enactus.org',
+        ticketType: 'General Admission',
+        status: 'Valid',
+        issuedBy: organizer1._id,
+      },
+      {
+        ticketCode: 'ENACTUS-CAMP-025',
+        event: events[2]._id,
+        recipientName: 'Team Tunisia National Finalist',
+        recipientEmail: 'team.tunisia@enactus.org',
+        ticketType: 'Speaker',
+        status: 'Valid',
+        issuedBy: organizer2._id,
+      },
+    ]);
+    console.log(`Created ${tickets.length} sample generated tickets.`);
     console.log('\n--- SEEDING COMPLETED SUCCESSFULLY ---');
     console.log('You can now log in with the following accounts:');
     console.log('1. System Admin:');

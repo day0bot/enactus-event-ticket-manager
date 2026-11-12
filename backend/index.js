@@ -5,6 +5,7 @@ import connectDB from "./config/db.js";
 import EventRouter from "./routes/Event.js";
 import AdminEventRouter from "./routes/AdminEvent.js";
 import bookingRoutes from "./routes/Bookings.js";
+import TicketRouter from "./routes/Ticket.js";
 import cookieParser from "cookie-parser";
 import userRoutes from "./routes/users.js";
 import authRouter from "./routes/auth.js";
@@ -81,6 +82,7 @@ app.use(authenticationMiddleware);
 app.use("/api/v1/events", EventRouter);
 app.use("/api/v1/admin/events", AdminEventRouter);
 app.use("/api/v1/bookings", bookingRoutes);
+app.use("/api/v1/tickets", TicketRouter);
 app.use("/api/v1/users", userRoutes);
 
 // Basic route

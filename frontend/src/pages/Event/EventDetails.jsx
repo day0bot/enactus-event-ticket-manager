@@ -4,26 +4,15 @@ import axios from "../../config/axios";
 import "../../stylesheets/EventDetails.css";
 import { useAuth } from "../../context/AuthContext";
 import { toast } from "react-toastify";
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  Typography,
-  Box,
-  TextField,
-  CircularProgress
-} from "@mui/material";
+import { exportToCsv } from "../../utils/csvExport";
+import { format } from "date-fns";
 
 const EventDetails = () => {
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [ticketQuantity, setTicketQuantity] = useState(1);
   const [organizerDetails, setOrganizerDetails] = useState(null);
-  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   const { id } = useParams();
   const navigate = useNavigate();
@@ -61,64 +50,51 @@ const EventDetails = () => {
     fetchEventDetails();
   }, [id, location.search]); // Re-fetch when URL parameters change
 
-  const handleQuantityChange = (e) => {
-    const value = parseInt(e.target.value);
-    const maxTickets = event?.remainingTickets || 0;
-    if (value > 0 && value <= maxTickets) {
-      setTicketQuantity(value);
-    }
+  const handleCreateTicketsClick = () => {
+    navigate(`/tickets?eventId=${id}&action=generate`);
   };
 
-  const handlePurchaseClick = () => {
-    if (!user) {
-      toast.error("Please login to purchase tickets");
-      navigate("/login", { state: { from: location.pathname } });
-      return;
-    }
-    setIsBookingModalOpen(true);
-  };
-
-  const handlePurchaseConfirm = async () => {
-    if (!user) {
-      toast.error("Please login to purchase tickets");
-      navigate("/login", { state: { from: location.pathname } });
-      return;
-    }
-
-    setIsProcessing(true);
+  const handleExportEventTicketsCsv = async () => {
+    setIsExporting(true);
     try {
-      // First check availability
-      const availabilityCheck = await axios.get(`/events/${id}`);
-      const event = availabilityCheck.data;
+      const res = await axios.get("/tickets");
+      const allTickets = res.data || [];
+      const eventTickets = allTickets.filter(
+        (t) => t.event && (t.event._id === id || t.event === id)
+      );
 
-      if (!event.remainingTickets || event.remainingTickets < ticketQuantity) {
-        toast.error("Sorry, not enough tickets available.");
-        setIsBookingModalOpen(false);
+      if (eventTickets.length === 0) {
+        toast.info("No tickets created yet for this event.");
         return;
       }
 
-      // Proceed with booking
-      const response = await axios.post(`/bookings`, {
-        eventId: id,
-        numberOfTickets: ticketQuantity
-      });
+      const columns = [
+        { header: "Ticket Code", key: "ticketCode" },
+        { header: "Event Title", key: () => event?.title || "N/A" },
+        {
+          header: "Event Date",
+          key: () => (event?.date ? format(new Date(event.date), "yyyy-MM-dd") : "N/A"),
+        },
+        { header: "Location", key: () => event?.location || "N/A" },
+        { header: "Recipient Name", key: "recipientName" },
+        { header: "Recipient Email", key: "recipientEmail" },
+        { header: "Ticket Type", key: "ticketType" },
+        { header: "Status", key: "status" },
+        {
+          header: "Issued Date",
+          key: (t) => (t.createdAt ? format(new Date(t.createdAt), "yyyy-MM-dd HH:mm") : "N/A"),
+        },
+      ];
 
-      if (response.data) {
-        toast.success("Tickets booked successfully!");
-        setIsBookingModalOpen(false);
-        // Redirect to bookings page after a short delay to show the success message
-        setTimeout(() => {
-          navigate("/bookings");
-        }, 1500);
-      }
-    } catch (error) {
-      console.error('Booking error:', error);
-      toast.error(error.response?.data?.message || "Failed to book tickets. Please try again.");
-      if (error.response?.status === 400) {
-        setIsBookingModalOpen(false);
-      }
+      const safeTitle = (event?.title || "event").replace(/[^a-z0-9]/gi, "_").toLowerCase();
+      const filename = `tickets_${safeTitle}_${format(new Date(), "yyyyMMdd_HHmm")}`;
+      exportToCsv(filename, eventTickets, columns);
+      toast.success(`Exported ${eventTickets.length} tickets to CSV successfully!`);
+    } catch (err) {
+      console.error("Error exporting event tickets:", err);
+      toast.error("Failed to export tickets to CSV");
     } finally {
-      setIsProcessing(false);
+      setIsExporting(false);
     }
   };
 
@@ -344,28 +320,33 @@ const EventDetails = () => {
                 </div>
               </div>
 
-              {isEventAvailable() && (
-                <div className="ticket-purchase-section">
-                  <div className="quantity-selector">
-                    <label htmlFor="ticketQuantity">Number of Tickets:</label>
-                    <input
-                      type="number"
-                      id="ticketQuantity"
-                      min="1"
-                      max={event.remainingTickets}
-                      value={ticketQuantity}
-                      onChange={handleQuantityChange}
-                    />
-                  </div>
-                  <button
-                    className="btn-purchase"
-                    onClick={handlePurchaseClick}
-                    disabled={!isEventAvailable()}
-                  >
-                    Purchase Tickets
-                  </button>
-                </div>
-              )}
+              <div className="ticket-purchase-section flex flex-col gap-3 mt-4">
+                <button
+                  className="btn-purchase w-full !bg-amber-500 hover:!bg-amber-400 !text-neutral-950 !font-bold py-3 rounded-xl transition shadow flex items-center justify-center gap-2"
+                  onClick={handleCreateTicketsClick}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                  </svg>
+                  Issue / Create Tickets
+                </button>
+                <button
+                  className="w-full bg-neutral-800 hover:bg-neutral-700 text-amber-400 font-semibold py-2.5 rounded-xl border border-amber-500/30 transition flex items-center justify-center gap-2 text-sm"
+                  onClick={handleExportEventTicketsCsv}
+                  disabled={isExporting}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  {isExporting ? "Exporting..." : "Export Event Tickets (CSV)"}
+                </button>
+                <button
+                  className="w-full bg-transparent hover:bg-neutral-800/60 text-neutral-400 font-medium py-2 rounded-xl text-xs transition"
+                  onClick={() => navigate("/")}
+                >
+                  &larr; Back to Dashboard
+                </button>
+              </div>
             </div>
 
             <div className="event-description">
@@ -375,39 +356,6 @@ const EventDetails = () => {
           </div>
         </div>
       </div>
-
-      {/* Booking Confirmation Modal */}
-      <Dialog open={isBookingModalOpen} onClose={() => setIsBookingModalOpen(false)}>
-        <DialogTitle>Confirm Your Booking</DialogTitle>
-        <DialogContent>
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="h6">{event?.title}</Typography>
-            <Typography variant="body2" color="text.secondary">
-              {formatDate(event?.date)}
-            </Typography>
-          </Box>
-
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="subtitle1">Booking Summary</Typography>
-            <Typography>Quantity: {ticketQuantity} tickets</Typography>
-            <Typography>Price per ticket: ${event?.ticketPricing}</Typography>
-            <Typography variant="h6" sx={{ mt: 1 }}>
-              Total: ${(event?.ticketPricing * ticketQuantity).toFixed(2)}
-            </Typography>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setIsBookingModalOpen(false)}>Cancel</Button>
-          <Button
-            onClick={handlePurchaseConfirm}
-            variant="contained"
-            color="primary"
-            disabled={isProcessing}
-          >
-            {isProcessing ? <CircularProgress size={24} /> : 'Confirm Purchase'}
-          </Button>
-        </DialogActions>
-      </Dialog>
     </>
   );
 };

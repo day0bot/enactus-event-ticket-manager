@@ -19,6 +19,7 @@ import EventDetails from "./pages/Event/EventDetails.jsx";
 import EditEvent from "./pages/Event/EditEvent.jsx";
 import BookingDetails from "./pages/Booking/BookingDetails.jsx";
 import MyEvents from "./pages/Event/MyEvents.jsx";
+import TicketManager from "./pages/Tickets/TicketManager.jsx";
 import { AuthProvider } from './context/AuthContext';
 import 'react-toastify/dist/ReactToastify.css';
 import EventAnalytics from "./pages/Event/EventAnalytics.jsx";
@@ -38,6 +39,7 @@ function App() {
                 <Route path="/contact" element={<Contact />} />
                 <Route path="/events" element={<ProtectedRoute requireAuth={false}><EventList /></ProtectedRoute>} />
                 <Route path="/events/:id" element={<ProtectedRoute requireAuth={false}><EventDetails /></ProtectedRoute>} />
+                <Route path="/tickets" element={<ProtectedRoute><TicketManager /></ProtectedRoute>} />
                 <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
                 {/* Protected Routes - Standard User */}

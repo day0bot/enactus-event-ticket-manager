@@ -15,7 +15,7 @@ function Profile() {
         const fetchActiveBookings = async () => {
             try {
                 const response = await axios.get('/users/bookings');
-                const bookings = response.data;
+                const bookings = Array.isArray(response.data) ? response.data : [];
                 // Count only confirmed bookings
                 const confirmedBookings = bookings.filter(booking => 
                     booking.status?.toLowerCase() === 'confirmed'

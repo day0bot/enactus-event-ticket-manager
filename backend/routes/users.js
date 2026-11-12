@@ -18,10 +18,10 @@ const storage = new CloudinaryStorage({
 
 const upload = multer({ storage });
 
-// Get current user's bookings (Standard User only)
+// Get current user's bookings (All authenticated users)
 router.get(
     "/bookings",
-    authorizationMiddleware(["Standard User"]),
+    authorizationMiddleware(["Standard User", "Organizer", "System Admin"]),
     userController.getCurrentUserBookings
 );
 

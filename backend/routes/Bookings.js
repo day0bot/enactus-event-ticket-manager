@@ -5,24 +5,24 @@ import authorizationMiddleware from "../middleware/authorizationMiddleware.js";
 
 const router = express.Router();
 
-// Book tickets (Standard Users only)
+// Book tickets (All authenticated users)
 router.post(
   "/",
-  authorizationMiddleware(["Standard User"]),
+  authorizationMiddleware(["Standard User", "Organizer", "System Admin"]),
   BookingController.createBooking
 );
 
 // Get booking details
 router.get(
   "/:id",
-  authorizationMiddleware(["Standard User"]),
+  authorizationMiddleware(["Standard User", "Organizer", "System Admin"]),
   BookingController.getBookingById
 );
 
 // Cancel booking
 router.delete(
   "/:id",
-  authorizationMiddleware(["Standard User"]),
+  authorizationMiddleware(["Standard User", "Organizer", "System Admin"]),
   BookingController.cancelBooking
 );
 

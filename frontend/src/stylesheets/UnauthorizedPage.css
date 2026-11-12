@@ -1,0 +1,103 @@
+.unauthorized-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 80vh;
+  padding: 2rem;
+  background-color: #f8f9fa;
+}
+
+.unauthorized-content {
+  max-width: 500px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  padding: 3rem 2rem;
+  text-align: center;
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.unauthorized-icon {
+  color: #e74c3c;
+  margin-bottom: 1.5rem;
+}
+
+.unauthorized-content h1 {
+  color: #2c3e50;
+  margin: 0 0 0.5rem;
+  font-size: 2rem;
+  font-weight: 600;
+}
+
+.error-code {
+  font-size: 5rem;
+  font-weight: 700;
+  margin: 0.5rem 0;
+  color: #e74c3c;
+  line-height: 1;
+  opacity: 0.2;
+}
+
+.error-message {
+  color: #7f8c8d;
+  margin-bottom: 2rem;
+  font-size: 1.1rem;
+  line-height: 1.5;
+}
+
+.action-links {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.primary-button,
+.secondary-button {
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.primary-button {
+  background-color: #3498db;
+  color: white;
+  border: none;
+}
+
+.primary-button:hover {
+  background-color: #2980b9;
+}
+
+.secondary-button {
+  background-color: transparent;
+  color: #3498db;
+  border: 1px solid #3498db;
+}
+
+.secondary-button:hover {
+  background-color: rgba(52, 152, 219, 0.05);
+}
+
+@media (max-width: 576px) {
+  .action-links {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .unauthorized-content {
+    padding: 2rem 1.5rem;
+  }
+}

@@ -1,7 +1,7 @@
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 dotenv.config();
-const secretKey = process.env.SECRET_KEY;
+const secretKey = process.env.SECRET_KEY || "f7bdd79d79d44d3d599633a921f323a993b2bebc94bcf35f90790ff451bcb42c64a337eae1645b83ef35a412e28062b02f5678f9683d29682b13e6c7b8803c49";
 
 const authenticationMiddleware = (req, res, next) => {
   // Check Authorization header first

@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import mongoose from 'mongoose';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import connectDB from './config/db.js';
 import User from './models/UserModel.js';
 import EventModel from './models/EventModel.js';

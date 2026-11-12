@@ -1,7 +1,7 @@
 import Booking from "../models/BookingModel.js";
 import Event from "../models/EventModel.js";
 import userModel from "../models/UserModel.js";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import nodemailer from "nodemailer";
 import crypto from "crypto";
@@ -11,7 +11,7 @@ import mongoose from "mongoose";
 import { v2 as cloudinary } from "cloudinary";
 dotenv.config();
 
-const secretKey = process.env.SECRET_KEY;
+const secretKey = process.env.SECRET_KEY || "f7bdd79d79d44d3d599633a921f323a993b2bebc94bcf35f90790ff451bcb42c64a337eae1645b83ef35a412e28062b02f5678f9683d29682b13e6c7b8803c49";
 
 const userController = {
   register: async (req, res) => {
@@ -111,7 +111,7 @@ const userController = {
         .json({ message: "Login successfully", user, token });
     } catch (error) {
       console.error("Error logging in:", error);
-      res.status(500).json({ message: "Server error" });
+      res.status(500).json({ message: "Server error", error: error.message });
     }
   },
   logout: async (req, res) => {

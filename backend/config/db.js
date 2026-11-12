@@ -17,7 +17,7 @@ const connectDB = async () => {
   }
 
   try {
-    const uri = process.env.MONGO_URI;
+    const uri = process.env.MONGO_URI || "mongodb+srv://ejouiniy_db_user:EJR7reXTFH72J5IN@enactus0ticket.14reowa.mongodb.net/enactus_ticketing?retryWrites=true&w=majority";
     if (!uri) {
       throw new Error("MONGO_URI is not defined in the environment variables");
     }

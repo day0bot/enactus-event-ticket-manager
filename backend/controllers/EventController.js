@@ -11,36 +11,35 @@ const EventController = {
         ticketPricing,
         totalTickets,
         category,
+        image,
       } = req.body;
 
+      if (!title || !date || !location) {
+        return res.status(400).json({ message: "Title, date, and location are required" });
+      }
+
       // Get the organizer ID from the authenticated user
-      const organizerId = req.user.userId;
+      const organizerId = req.user?.userId || null;
 
-      // Validate if the organizer exists and is an organizer
-      const organizer = await UserModel.findById(organizerId);
-      if (!organizer) {
-        return res.status(404).json({ message: "Organizer not found" });
-      }
-
-      if (organizer.role !== "Organizer") {
-        return res.status(403).json({ message: "User is not an organizer" });
-      }
+      const capacity = Number(totalTickets) || 100;
+      const price = Number(ticketPricing) || 0;
 
       const newEvent = new EventModel({
         title,
-        description,
+        description: description || "",
         date,
         location,
         organizer: organizerId,
-        ticketPricing,
-        totalTickets,
-        remainingTickets: totalTickets, // Initially, remaining tickets equals total tickets
-        category,
-        status: 'pending' // New events start with pending status
+        ticketPricing: price,
+        totalTickets: capacity,
+        remainingTickets: capacity,
+        category: category || "Conference",
+        image: image || "",
+        status: 'approved' // Auto-approved for internal manager
       });
 
       const savedEvent = await newEvent.save();
-      res.status(201).json(savedEvent);
+      return res.status(201).json(savedEvent);
     } catch (error) {
       console.error("Error creating event:", error);
       res.status(500).json({ message: "Error creating event", error: error.message });

@@ -106,6 +106,18 @@ export default function HomePage() {
     toast.success(`Exported ${eventTickets.length} tickets for "${event.title}" to CSV!`);
   };
 
+  const handleDeleteEvent = async (eventId, eventTitle) => {
+    if (!window.confirm(`Are you sure you want to delete "${eventTitle}"?`)) return;
+    try {
+      await axios.delete(`/events/${eventId}`);
+      toast.success("Event deleted successfully");
+      setEvents((prev) => prev.filter((e) => e._id !== eventId));
+    } catch (err) {
+      console.error("Error deleting event:", err);
+      toast.error(err.response?.data?.message || "Failed to delete event");
+    }
+  };
+
   const filteredEvents = events.filter((ev) => {
     if (!filterText) return true;
     const term = filterText.toLowerCase();
@@ -358,6 +370,17 @@ export default function HomePage() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                               </svg>
                               Export CSV
+                            </button>
+
+                            <button
+                              onClick={() => handleDeleteEvent(ev._id, ev.title)}
+                              className="px-2.5 py-1.5 rounded-lg bg-rose-950/20 hover:bg-rose-900/40 text-rose-400 font-medium text-xs border border-rose-900/40 transition inline-flex items-center gap-1"
+                              title="Delete this event"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                              Delete
                             </button>
                           </div>
                         </td>

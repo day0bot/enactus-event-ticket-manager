@@ -1,18 +1,6 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import {
-  Container,
-  Paper,
-  Typography,
-  TextField,
-  Button,
-  Box,
-  Alert,
-  MenuItem,
-  CircularProgress,
-  InputAdornment
-} from "@mui/material";
-import { toast } from 'react-toastify';
+import { useNavigate, Link } from "react-router-dom";
+import { toast } from "react-toastify";
 import axios from "../../config/axios";
 import { useAuth } from "../../context/AuthContext";
 
@@ -21,14 +9,15 @@ const CATEGORIES = [
   "Workshop",
   "Concert",
   "Exhibition",
+  "Pitch Competition",
+  "Summit",
   "Sport",
-  "Other"
+  "Other",
 ];
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-const ALLOWED_FILE_TYPES = ['image/jpeg', 'image/png', 'image/gif'];
+const DEFAULT_IMAGE = "https://images.unsplash.com/photo-1540575467063-178a50c2df87?ixlib=rb-1.2.1&auto=format&fit=crop&w=1000&q=80";
 
-function CreateEvent() {
+export default function CreateEvent() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [formData, setFormData] = useState({
@@ -36,258 +25,213 @@ function CreateEvent() {
     description: "",
     date: "",
     location: "",
-    category: "",
-    ticketPricing: "",
-    totalTickets: "",
+    category: "Conference",
+    ticketPricing: 25,
+    totalTickets: 100,
+    image: "",
   });
-  const [image, setImage] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-
-  const validateForm = () => {
-    if (!formData.title.trim()) {
-      setError("Title is required");
-      return false;
-    }
-    if (!formData.date) {
-      setError("Date is required");
-      return false;
-    }
-    if (!formData.location.trim()) {
-      setError("Location is required");
-      return false;
-    }
-    if (!formData.ticketPricing || formData.ticketPricing <= 0) {
-      setError("Valid ticket price is required");
-      return false;
-    }
-    if (!formData.totalTickets || formData.totalTickets <= 0) {
-      setError("Valid number of tickets is required");
-      return false;
-    }
-    return true;
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError(null);
-
-    if (!validateForm()) return;
-
-    // Convert form data to proper format
-    const eventPayload = {
-      title: formData.title,
-      description: formData.description || "",
-      date: formData.date,
-      location: formData.location,
-      category: formData.category || "Other",
-      ticketPricing: Number(formData.ticketPricing),
-      totalTickets: Number(formData.totalTickets),
-    };
+    if (!formData.title.trim() || !formData.date || !formData.location.trim()) {
+      toast.error("Please fill in Title, Date, and Location.");
+      return;
+    }
 
     setLoading(true);
-
     try {
-      console.log("Submitting event data:", eventPayload);
-      const response = await axios.post("/events", eventPayload);
+      const payload = {
+        title: formData.title.trim(),
+        description: formData.description.trim(),
+        date: formData.date,
+        location: formData.location.trim(),
+        category: formData.category,
+        ticketPricing: Number(formData.ticketPricing) || 0,
+        totalTickets: Number(formData.totalTickets) || 100,
+        image: formData.image.trim() || DEFAULT_IMAGE,
+      };
 
-      console.log("Event creation response:", response.data);
-      toast.success("Event created successfully! It will be visible after admin approval.");
-      
-      // Clear form
-      setFormData({
-        title: "",
-        description: "",
-        date: "",
-        location: "",
-        category: "",
-        ticketPricing: "",
-        totalTickets: "",
-      });
-      setImage(null);
-      
-      // Navigate after a short delay to allow the user to see the success message
-      setTimeout(() => {
-        navigate("/my-events");
-      }, 1500);
+      await axios.post("/events", payload);
+      toast.success("Event created successfully!");
+      navigate("/events");
     } catch (err) {
-      console.error("Error creating event:", {
-        error: err,
-        response: err.response?.data,
-        status: err.response?.status,
-        headers: err.response?.headers
-      });
-      setError(err.response?.data?.message || "Failed to create event");
+      console.error("Error creating event:", err);
       toast.error(err.response?.data?.message || "Failed to create event");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    if (!ALLOWED_FILE_TYPES.includes(file.type)) {
-      setError("Please upload an image file (JPEG, PNG, or GIF)");
-      return;
-    }
-
-    if (file.size > MAX_FILE_SIZE) {
-      setError("File size should be less than 5MB");
-      return;
-    }
-
-    setImage(file);
-    setError(null);
-  };
-
   return (
-    <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
-      <Box component={Paper} p={4}>
-        <Typography variant="h4" gutterBottom>
-          Create New Event
-        </Typography>
+    <div className="min-h-screen bg-neutral-950 text-white py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-2xl mx-auto space-y-8">
+        
+        {/* Header Breadcrumb */}
+        <div className="flex items-center justify-between">
+          <Link
+            to="/events"
+            className="text-sm font-semibold text-amber-400 hover:text-amber-300 flex items-center gap-1.5 transition"
+          >
+            &larr; Back to Events
+          </Link>
+          <span className="text-xs uppercase tracking-wider text-neutral-500 font-semibold">
+            Enactus Operations
+          </span>
+        </div>
 
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
-          </Alert>
-        )}
-
-        <form onSubmit={handleSubmit}>
-          <Box display="grid" gap={3}>
-            <TextField
-              label="Event Title"
-              name="title"
-              value={formData.title}
-              onChange={handleInputChange}
-              required
-              fullWidth
+        {/* Card Form */}
+        <div className="bg-neutral-900 border border-amber-500/30 rounded-3xl p-8 sm:p-10 shadow-2xl relative overflow-hidden">
+          <div className="flex items-center space-x-4 mb-8 pb-6 border-b border-neutral-800">
+            <img
+              src="/enactus-logo.png"
+              alt="Enactus"
+              className="w-14 h-14 rounded-2xl object-contain border border-amber-500/40 p-1 bg-black"
             />
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-white">Create New Event</h1>
+              <p className="text-sm text-neutral-400 mt-0.5">
+                Set up ticket allocation, date, and venue for your gathering
+              </p>
+            </div>
+          </div>
 
-            <TextField
-              label="Description"
-              name="description"
-              value={formData.description}
-              onChange={handleInputChange}
-              multiline
-              rows={4}
-              fullWidth
-            />
-
-            <TextField
-              label="Date and Time"
-              name="date"
-              type="datetime-local"
-              value={formData.date}
-              onChange={handleInputChange}
-              required
-              fullWidth
-              InputLabelProps={{
-                shrink: true,
-              }}
-            />
-
-            <TextField
-              label="Location"
-              name="location"
-              value={formData.location}
-              onChange={handleInputChange}
-              required
-              fullWidth
-            />
-
-            <TextField
-              select
-              label="Category"
-              name="category"
-              value={formData.category}
-              onChange={handleInputChange}
-              fullWidth
-            >
-              {CATEGORIES.map((option) => (
-                <MenuItem key={option} value={option}>
-                  {option}
-                </MenuItem>
-              ))}
-            </TextField>
-
-            <TextField
-              label="Ticket Price"
-              name="ticketPricing"
-              type="number"
-              value={formData.ticketPricing}
-              onChange={handleInputChange}
-              required
-              fullWidth
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">$</InputAdornment>
-                ),
-              }}
-            />
-
-            <TextField
-              label="Total Tickets"
-              name="totalTickets"
-              type="number"
-              value={formData.totalTickets}
-              onChange={handleInputChange}
-              required
-              fullWidth
-            />
-
-            <Box>
-              <input
-                accept="image/*"
-                style={{ display: 'none' }}
-                id="image-upload"
-                type="file"
-                onChange={handleImageChange}
-              />
-              <label htmlFor="image-upload">
-                <Button variant="outlined" component="span" fullWidth>
-                  Upload Event Image
-                </Button>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <label className="block text-xs font-semibold text-neutral-300 uppercase tracking-wider mb-2">
+                Event Title *
               </label>
-              {image && (
-                <Typography variant="caption" display="block" mt={1}>
-                  Selected file: {image.name}
-                </Typography>
-              )}
-            </Box>
+              <input
+                type="text"
+                required
+                placeholder="e.g. Enactus Innovation Showcase 2026"
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-3.5 text-white focus:outline-none focus:border-amber-500"
+              />
+            </div>
 
-            <Button
-              type="submit"
-              variant="contained"
-              color="primary"
-              size="large"
-              disabled={loading}
-              fullWidth
-            >
-              {loading ? (
-                <>
-                  <CircularProgress size={24} sx={{ mr: 1 }} />
-                  Creating Event...
-                </>
-              ) : (
-                "Create Event"
-              )}
-            </Button>
-          </Box>
-        </form>
-      </Box>
-    </Container>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <div>
+                <label className="block text-xs font-semibold text-neutral-300 uppercase tracking-wider mb-2">
+                  Category *
+                </label>
+                <select
+                  value={formData.category}
+                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-3.5 text-white focus:outline-none focus:border-amber-500"
+                >
+                  {CATEGORIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-neutral-300 uppercase tracking-wider mb-2">
+                  Date & Time *
+                </label>
+                <input
+                  type="datetime-local"
+                  required
+                  value={formData.date}
+                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                  className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-3.5 text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-neutral-300 uppercase tracking-wider mb-2">
+                Venue / Location *
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. Grand Amphitheater / Campus Center"
+                value={formData.location}
+                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-3.5 text-white focus:outline-none focus:border-amber-500"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <div>
+                <label className="block text-xs font-semibold text-neutral-300 uppercase tracking-wider mb-2">
+                  Ticket Price ($)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="25"
+                  value={formData.ticketPricing}
+                  onChange={(e) => setFormData({ ...formData, ticketPricing: e.target.value })}
+                  className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-3.5 text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-neutral-300 uppercase tracking-wider mb-2">
+                  Max Audience Capacity
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  placeholder="150"
+                  value={formData.totalTickets}
+                  onChange={(e) => setFormData({ ...formData, totalTickets: e.target.value })}
+                  className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-3.5 text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-neutral-300 uppercase tracking-wider mb-2">
+                Banner Image URL (Optional)
+              </label>
+              <input
+                type="url"
+                placeholder="https://images.unsplash.com/..."
+                value={formData.image}
+                onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+                className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-3.5 text-white focus:outline-none focus:border-amber-500 text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-neutral-300 uppercase tracking-wider mb-2">
+                Description
+              </label>
+              <textarea
+                rows="4"
+                placeholder="Highlight speakers, musical performances, workshops, and rules..."
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                className="w-full bg-neutral-950 border border-neutral-700 rounded-xl p-3.5 text-white focus:outline-none focus:border-amber-500 text-sm"
+              ></textarea>
+            </div>
+
+            <div className="pt-4 border-t border-neutral-800 flex justify-end gap-3">
+              <Link
+                to="/events"
+                className="px-6 py-3 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-semibold transition text-sm"
+              >
+                Cancel
+              </Link>
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-8 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold transition shadow-lg disabled:opacity-50 text-sm"
+              >
+                {loading ? "Publishing..." : "Save & Publish Event"}
+              </button>
+            </div>
+          </form>
+        </div>
+
+      </div>
+    </div>
   );
 }
-
-export default CreateEvent;

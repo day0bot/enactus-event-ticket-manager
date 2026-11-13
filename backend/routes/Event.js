@@ -1,6 +1,6 @@
 import express from "express";
 const router = express.Router();
-import authorizationMiddleware from "../middleware/authorizationMiddleware.js";
+import authenticationMiddleware from "../middleware/authenticationMiddleware.js";
 import EventController from "../controllers/EventController.js";
 
 // Public routes
@@ -8,28 +8,28 @@ router.get("/approved", EventController.GetAllApprovedEvents);
 router.get("/", EventController.GetAllApprovedEvents);
 router.get("/:id", EventController.GetEventById);
 
-// Organizer routes (protected)
+// Protected routes (Admin, Organizer, Standard User)
 router.post(
   "/",
-  authorizationMiddleware(["Organizer"]),
+  authenticationMiddleware,
   EventController.CreateEvent
 );
 
 router.get(
   "/organizer/all",
-  authorizationMiddleware(["Organizer"]),
+  authenticationMiddleware,
   EventController.GetAllEvents
 );
 
 router.put(
   "/:id",
-  authorizationMiddleware(["Organizer"]),
+  authenticationMiddleware,
   EventController.UpdateEvent
 );
 
 router.delete(
   "/:id",
-  authorizationMiddleware(["Organizer"]),
+  authenticationMiddleware,
   EventController.DeleteEvent
 );
 

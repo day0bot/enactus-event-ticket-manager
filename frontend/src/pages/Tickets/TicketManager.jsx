@@ -4,6 +4,7 @@ import axios from "../../config/axios";
 import { toast } from "react-toastify";
 import { exportToCsv } from "../../utils/csvExport";
 import { format } from "date-fns";
+import { QRCodeSVG } from "qrcode.react";
 
 export default function TicketManager() {
   const [searchParams] = useSearchParams();
@@ -27,6 +28,9 @@ export default function TicketManager() {
   const [verifyCode, setVerifyCode] = useState("");
   const [verifyResult, setVerifyResult] = useState(null);
   const [isVerifying, setIsVerifying] = useState(false);
+
+  // QR Code Pass Viewer State
+  const [selectedTicketForQr, setSelectedTicketForQr] = useState(null);
 
   useEffect(() => {
     fetchInitialData();
@@ -198,6 +202,10 @@ export default function TicketManager() {
       { header: "Ticket Type", key: "ticketType" },
       { header: "Status", key: "status" },
       {
+        header: "QR Scanner URL",
+        key: (t) => `${window.location.origin}/verify/${t.ticketCode}`,
+      },
+      {
         header: "Issued Date",
         key: (t) => (t.createdAt ? format(new Date(t.createdAt), "yyyy-MM-dd HH:mm") : "N/A"),
       },
@@ -352,20 +360,38 @@ export default function TicketManager() {
                         </span>
                       </td>
                       <td className="py-4 px-6">
-                        <span className="inline-block px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-950 border border-emerald-500/40 text-emerald-400">
-                          {ticket.status}
+                        <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-bold ${
+                          ticket.status === "Used"
+                            ? "bg-amber-950/80 border border-amber-500/50 text-amber-400"
+                            : ticket.status === "Cancelled"
+                            ? "bg-rose-950 border border-rose-500/40 text-rose-400"
+                            : "bg-emerald-950 border border-emerald-500/40 text-emerald-400"
+                        }`}>
+                          {ticket.status === "Used" ? "Used (Admitted)" : ticket.status}
                         </span>
                       </td>
                       <td className="py-4 px-6 text-slate-400">
                         {ticket.createdAt ? format(new Date(ticket.createdAt), "MMM d, yyyy") : "N/A"}
                       </td>
                       <td className="py-4 px-6 text-right">
-                        <button
-                          onClick={() => handleDeleteTicket(ticket._id)}
-                          className="text-rose-400 hover:text-rose-300 text-xs font-bold px-2.5 py-1 rounded-lg hover:bg-rose-950/40 transition-colors"
-                        >
-                          Delete
-                        </button>
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => setSelectedTicketForQr(ticket)}
+                            className="bg-neutral-800 hover:bg-neutral-700 text-amber-400 hover:text-amber-300 text-xs font-bold px-2.5 py-1 rounded-lg border border-amber-500/30 transition-colors inline-flex items-center gap-1"
+                            title="View scannable QR Code pass"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                            </svg>
+                            QR Pass
+                          </button>
+                          <button
+                            onClick={() => handleDeleteTicket(ticket._id)}
+                            className="text-rose-400 hover:text-rose-300 text-xs font-bold px-2.5 py-1 rounded-lg hover:bg-rose-950/40 transition-colors"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -623,6 +649,89 @@ export default function TicketManager() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* QR Code Pass Viewer & Print Modal */}
+      {selectedTicketForQr && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-neutral-950 border-2 border-amber-500/50 rounded-3xl max-w-sm w-full p-6 shadow-2xl relative text-center">
+            <button
+              onClick={() => setSelectedTicketForQr(null)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white text-xl font-bold p-1"
+            >
+              ✕
+            </button>
+
+            {/* Ticket Header */}
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <img
+                src="/enactus-logo.png"
+                alt="Enactus"
+                className="w-10 h-10 rounded-xl object-contain border border-amber-500/40 p-1 bg-black"
+              />
+              <div className="text-left">
+                <div className="text-xs font-bold uppercase tracking-wider text-amber-400">Enactus Official Pass</div>
+                <div className="text-sm font-extrabold text-white">Concert Admission</div>
+              </div>
+            </div>
+
+            {/* QR Code Container */}
+            <div className="bg-white p-4 rounded-2xl inline-block shadow-inner mb-4">
+              <QRCodeSVG
+                value={`${window.location.origin}/verify/${selectedTicketForQr.ticketCode}`}
+                size={200}
+                level="H"
+                includeMargin={false}
+              />
+            </div>
+
+            {/* Ticket Information */}
+            <div className="space-y-2 mb-5">
+              <div className="font-mono text-xl font-black text-amber-400 tracking-wider">
+                {selectedTicketForQr.ticketCode}
+              </div>
+
+              <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-3 text-left space-y-1">
+                <div className="text-xs text-neutral-400">
+                  Event: <strong className="text-white">{selectedTicketForQr.event?.title || "Enactus Event"}</strong>
+                </div>
+                <div className="text-xs text-neutral-400">
+                  Attendee: <strong className="text-amber-300">{selectedTicketForQr.recipientName || "Guest"}</strong>
+                </div>
+                <div className="text-xs text-neutral-400">
+                  Tier: <strong className="text-white">{selectedTicketForQr.ticketType}</strong>
+                </div>
+                <div className="text-xs text-neutral-400">
+                  Status: <strong className={selectedTicketForQr.status === "Used" ? "text-amber-400" : "text-emerald-400"}>
+                    {selectedTicketForQr.status}
+                  </strong>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-neutral-400 leading-tight">
+                Scan with any phone camera or Play Store QR scanner app to admit attendee.
+                <br />
+                <span className="text-amber-400 font-semibold">One-time use: Re-scanning is permanently blocked!</span>
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => window.print()}
+                className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold rounded-xl text-xs transition shadow"
+              >
+                🖨️ Print Pass
+              </button>
+              <button
+                onClick={() => setSelectedTicketForQr(null)}
+                className="flex-1 py-2.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-semibold rounded-xl text-xs transition border border-neutral-700"
+              >
+                Done
+              </button>
+            </div>
           </div>
         </div>
       )}

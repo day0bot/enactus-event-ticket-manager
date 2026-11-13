@@ -53,6 +53,10 @@ export default function HomePage() {
       { header: "Ticket Type", key: "ticketType" },
       { header: "Status", key: "status" },
       {
+        header: "QR Scanner URL",
+        key: (t) => `${window.location.origin}/verify/${t.ticketCode}`,
+      },
+      {
         header: "Issued Date",
         key: (t) => (t.createdAt ? format(new Date(t.createdAt), "yyyy-MM-dd HH:mm") : "N/A"),
       },
@@ -86,6 +90,10 @@ export default function HomePage() {
       { header: "Recipient Email", key: "recipientEmail" },
       { header: "Ticket Type", key: "ticketType" },
       { header: "Status", key: "status" },
+      {
+        header: "QR Scanner URL",
+        key: (t) => `${window.location.origin}/verify/${t.ticketCode}`,
+      },
       {
         header: "Issued Date",
         key: (t) => (t.createdAt ? format(new Date(t.createdAt), "yyyy-MM-dd HH:mm") : "N/A"),

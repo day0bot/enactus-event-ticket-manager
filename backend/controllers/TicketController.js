@@ -163,6 +163,59 @@ const TicketController = {
       return res.status(500).json({ valid: false, message: "Verification failed", error: error.message });
     }
   },
+
+  // Public instant scan for generic phone QR scanners (One-Time Use)
+  publicScanTicket: async (req, res) => {
+    try {
+      const { code } = req.params;
+      if (!code) {
+        return res.status(400).json({ status: "INVALID", message: "No ticket code provided." });
+      }
+
+      const formattedCode = code.trim().toUpperCase();
+      const ticket = await Ticket.findOne({ ticketCode: formattedCode })
+        .populate("event", "title date location");
+
+      if (!ticket) {
+        return res.status(404).json({
+          status: "INVALID",
+          message: `Ticket Not Found: "${formattedCode}" is not a valid ticket.`,
+        });
+      }
+
+      if (ticket.status === "Used") {
+        return res.status(200).json({
+          status: "ALREADY_USED",
+          message: "ENTRY DENIED: This ticket was ALREADY SCANNED and USED!",
+          ticket,
+          checkedInAt: ticket.checkedInAt || ticket.updatedAt,
+        });
+      }
+
+      if (ticket.status === "Cancelled") {
+        return res.status(200).json({
+          status: "CANCELLED",
+          message: "ENTRY DENIED: This ticket has been CANCELLED.",
+          ticket,
+        });
+      }
+
+      // First-time scan -> Mark as Used immediately (One-Time Use Enforcement)
+      ticket.status = "Used";
+      ticket.checkedInAt = new Date();
+      await ticket.save();
+
+      return res.status(200).json({
+        status: "SUCCESS",
+        message: "VALID TICKET - ADMIT ONE!",
+        ticket,
+        checkedInAt: ticket.checkedInAt,
+      });
+    } catch (error) {
+      console.error("Error in public scan:", error);
+      return res.status(500).json({ status: "ERROR", message: "Scan processing error", error: error.message });
+    }
+  },
 };
 
 export default TicketController;

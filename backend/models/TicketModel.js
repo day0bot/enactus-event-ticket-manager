@@ -33,6 +33,10 @@ const ticketSchema = new mongoose.Schema(
       enum: ["Valid", "Used", "Cancelled"],
       default: "Valid",
     },
+    checkedInAt: {
+      type: Date,
+      default: null,
+    },
     issuedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

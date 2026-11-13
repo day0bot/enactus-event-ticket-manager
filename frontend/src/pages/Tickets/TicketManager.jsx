@@ -22,6 +22,12 @@ export default function TicketManager() {
   const [ticketType, setTicketType] = useState("General Admission");
   const [isGenerating, setIsGenerating] = useState(false);
 
+  // Concert entrance validator / scanner state
+  const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
+  const [verifyCode, setVerifyCode] = useState("");
+  const [verifyResult, setVerifyResult] = useState(null);
+  const [isVerifying, setIsVerifying] = useState(false);
+
   useEffect(() => {
     fetchInitialData();
   }, []);
@@ -35,6 +41,9 @@ export default function TicketManager() {
       if (openAction === "generate") {
         setIsModalOpen(true);
       }
+    }
+    if (openAction === "validate") {
+      setIsVerifyModalOpen(true);
     }
   }, [searchParams]);
 
@@ -107,6 +116,53 @@ export default function TicketManager() {
     }
   };
 
+  // Verify ticket code at the entrance
+  const handleVerifyTicket = async (e, forceCheckIn = false) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!verifyCode.trim()) {
+      toast.error("Please enter a ticket code");
+      return;
+    }
+
+    setIsVerifying(true);
+    setVerifyResult(null);
+    try {
+      const res = await axios.post("/tickets/verify", {
+        ticketCode: verifyCode.trim(),
+        checkIn: forceCheckIn,
+      });
+
+      setVerifyResult(res.data);
+      if (res.data?.valid) {
+        if (forceCheckIn) {
+          toast.success("Ticket verified & checked in!");
+          setTickets((prev) =>
+            prev.map((t) =>
+              t.ticketCode === res.data.ticket?.ticketCode
+                ? { ...t, status: "Used" }
+                : t
+            )
+          );
+        } else {
+          toast.success("Ticket is Valid!");
+        }
+      } else {
+        toast.warning(res.data?.message || "Invalid ticket");
+      }
+    } catch (err) {
+      console.error("Verification error:", err);
+      const errMsg = err.response?.data?.message || "Ticket verification failed";
+      setVerifyResult({
+        valid: false,
+        status: "NotFound",
+        message: errMsg,
+      });
+      toast.error(errMsg);
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
   // Filter tickets
   const filteredTickets = tickets.filter((ticket) => {
     const matchesEvent =
@@ -174,6 +230,19 @@ export default function TicketManager() {
           </div>
 
           <div className="flex flex-wrap gap-3 w-full sm:w-auto">
+            <button
+              onClick={() => {
+                setVerifyResult(null);
+                setVerifyCode("");
+                setIsVerifyModalOpen(true);
+              }}
+              className="flex-1 sm:flex-none inline-flex items-center justify-center px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg transition-all"
+            >
+              <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Concert Gate Validator
+            </button>
             <button
               onClick={() => setIsModalOpen(true)}
               className="flex-1 sm:flex-none inline-flex items-center justify-center px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-xl shadow-lg transition-all"
@@ -413,6 +482,144 @@ export default function TicketManager() {
                   className="px-6 py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-xl transition-colors disabled:opacity-50"
                 >
                   {isGenerating ? "Generating..." : "Generate Tickets"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Gate Validator Modal */}
+      {isVerifyModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-neutral-950 border border-emerald-500/40 rounded-2xl max-w-lg w-full p-6 shadow-2xl relative">
+            <div className="flex justify-between items-center mb-6 border-b border-neutral-800 pb-4">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-emerald-500/10 text-emerald-400 rounded-xl">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-white">Concert Gate Validator</h3>
+                  <p className="text-xs text-neutral-400">Scan or enter ticket code to verify & admit attendees</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsVerifyModalOpen(false)}
+                className="text-slate-400 hover:text-white text-xl font-bold p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={(e) => handleVerifyTicket(e, false)} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                  Ticket Code / Barcode (e.g. ENACTUS-A1B2C3)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    required
+                    autoFocus
+                    placeholder="Enter or scan code..."
+                    value={verifyCode}
+                    onChange={(e) => setVerifyCode(e.target.value.toUpperCase())}
+                    className="flex-1 bg-neutral-900 border border-neutral-700 rounded-xl p-3 text-lg font-mono font-bold text-amber-400 tracking-wider focus:outline-none focus:border-emerald-500 uppercase"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isVerifying}
+                    className="px-5 bg-neutral-800 hover:bg-neutral-700 text-white font-semibold rounded-xl border border-neutral-700 transition"
+                  >
+                    {isVerifying ? "Checking..." : "Verify"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Live Verification Result Box */}
+              {verifyResult && (
+                <div
+                  className={`p-4 rounded-xl border mt-4 ${
+                    verifyResult.valid
+                      ? verifyResult.status === "Used"
+                        ? "bg-amber-950/30 border-amber-500/50 text-amber-200"
+                        : "bg-emerald-950/40 border-emerald-500/50 text-emerald-200"
+                      : "bg-rose-950/40 border-rose-500/50 text-rose-200"
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="text-2xl">
+                      {verifyResult.valid
+                        ? verifyResult.status === "Used"
+                          ? "⚠️"
+                          : "✅"
+                        : "❌"}
+                    </span>
+                    <div className="flex-1">
+                      <h4 className="font-bold text-base">{verifyResult.message}</h4>
+                      {verifyResult.ticket && (
+                        <div className="mt-2 text-xs space-y-1 text-neutral-300">
+                          <div>
+                            <span className="text-neutral-500">Event:</span>{" "}
+                            <span className="font-semibold text-white">
+                              {verifyResult.ticket.event?.title || "N/A"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-neutral-500">Attendee:</span>{" "}
+                            <span className="font-semibold text-white">
+                              {verifyResult.ticket.recipientName || "General Guest"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-neutral-500">Tier:</span>{" "}
+                            <span className="font-semibold text-amber-400">
+                              {verifyResult.ticket.ticketType || "General"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-neutral-500">Current Status:</span>{" "}
+                            <span
+                              className={`font-bold uppercase ${
+                                verifyResult.ticket.status === "Valid"
+                                  ? "text-emerald-400"
+                                  : "text-amber-400"
+                              }`}
+                            >
+                              {verifyResult.ticket.status}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {verifyResult.valid && verifyResult.ticket?.status === "Valid" && (
+                    <div className="mt-4 pt-3 border-t border-emerald-500/30 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={(e) => handleVerifyTicket(e, true)}
+                        className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-bold rounded-xl transition shadow flex items-center justify-center gap-2"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                        Admit Attendee & Check-In (Mark Used)
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="flex justify-end pt-4 border-t border-neutral-800">
+                <button
+                  type="button"
+                  onClick={() => setIsVerifyModalOpen(false)}
+                  className="px-5 py-2.5 bg-neutral-800 hover:bg-neutral-700 text-slate-300 font-semibold rounded-xl transition"
+                >
+                  Close Gate
                 </button>
               </div>
             </form>

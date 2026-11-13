@@ -148,13 +148,22 @@ export default function HomePage() {
             {/* Top Action Buttons */}
             <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
               <Link
+                to="/tickets?action=validate"
+                className="flex-1 md:flex-none inline-flex items-center justify-center px-4 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-all shadow-lg active:scale-95"
+              >
+                <svg className="w-5 h-5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Gate Validator
+              </Link>
+              <Link
                 to="/tickets?action=generate"
                 className="flex-1 md:flex-none inline-flex items-center justify-center px-5 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold transition-all shadow-lg hover:shadow-amber-500/20 active:scale-95"
               >
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
                 </svg>
-                Issue / Create Tickets
+                Issue Tickets
               </Link>
               <button
                 onClick={handleExportAllTickets}

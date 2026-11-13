@@ -98,6 +98,71 @@ const TicketController = {
       return res.status(500).json({ message: "Failed to delete ticket", error: error.message });
     }
   },
+
+  // Verify and check in a ticket at the venue/concert entrance
+  verifyTicket: async (req, res) => {
+    try {
+      const { ticketCode, checkIn = false } = req.body;
+
+      if (!ticketCode) {
+        return res.status(400).json({ valid: false, message: "Ticket code is required" });
+      }
+
+      const formattedCode = ticketCode.trim().toUpperCase();
+      const ticket = await Ticket.findOne({ ticketCode: formattedCode })
+        .populate("event", "title date location");
+
+      if (!ticket) {
+        return res.status(404).json({
+          valid: false,
+          status: "NotFound",
+          message: `Invalid Ticket: Code "${formattedCode}" not found!`,
+        });
+      }
+
+      if (ticket.status === "Used") {
+        return res.status(200).json({
+          valid: false,
+          status: "Used",
+          message: "TICKET ALREADY USED! Previously admitted.",
+          ticket,
+        });
+      }
+
+      if (ticket.status === "Cancelled") {
+        return res.status(200).json({
+          valid: false,
+          status: "Cancelled",
+          message: "TICKET CANCELLED: Access denied.",
+          ticket,
+        });
+      }
+
+      // If checkIn requested, mark as Used
+      if (checkIn) {
+        ticket.status = "Used";
+        await ticket.save();
+        return res.status(200).json({
+          valid: true,
+          status: "Used",
+          checkedIn: true,
+          message: "VALID TICKET! Attendee admitted and checked in.",
+          ticket,
+        });
+      }
+
+      return res.status(200).json({
+        valid: true,
+        status: "Valid",
+        checkedIn: false,
+        message: "VALID TICKET! Ready for entrance check-in.",
+        ticket,
+      });
+    } catch (error) {
+      console.error("Error verifying ticket:", error);
+      return res.status(500).json({ valid: false, message: "Verification failed", error: error.message });
+    }
+  },
 };
 
 export default TicketController;

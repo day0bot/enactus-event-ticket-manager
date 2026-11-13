@@ -6,6 +6,7 @@ const router = express.Router();
 
 // Allow authenticated users (Admin, Organizer, Standard User) to generate and view tickets
 router.post("/generate", authenticationMiddleware, TicketController.generateTickets);
+router.post("/verify", authenticationMiddleware, TicketController.verifyTicket);
 router.get("/", authenticationMiddleware, TicketController.getTickets);
 router.delete("/:id", authenticationMiddleware, TicketController.deleteTicket);
 

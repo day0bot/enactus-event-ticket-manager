@@ -71,6 +71,7 @@ app.get("/api/health", (req, res) => {
 
 // Public routes
 app.use("/api/v1/auth", authRouter);
+app.use("/api/v1/tickets", TicketRouter);
 
 // Public event endpoints
 app.get("/api/v1/events", EventController.GetAllApprovedEvents);
@@ -82,7 +83,6 @@ app.use(authenticationMiddleware);
 app.use("/api/v1/events", EventRouter);
 app.use("/api/v1/admin/events", AdminEventRouter);
 app.use("/api/v1/bookings", bookingRoutes);
-app.use("/api/v1/tickets", TicketRouter);
 app.use("/api/v1/users", userRoutes);
 
 // Basic route

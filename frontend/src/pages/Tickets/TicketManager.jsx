@@ -5,6 +5,7 @@ import { toast } from "react-toastify";
 import { exportToCsv } from "../../utils/csvExport";
 import { format } from "date-fns";
 import { QRCodeSVG } from "qrcode.react";
+import BarcodeDisplay from "../../components/BarcodeDisplay.jsx";
 
 export default function TicketManager() {
   const [searchParams] = useSearchParams();
@@ -29,8 +30,9 @@ export default function TicketManager() {
   const [verifyResult, setVerifyResult] = useState(null);
   const [isVerifying, setIsVerifying] = useState(false);
 
-  // QR Code Pass Viewer State
+  // QR Code & Barcode Pass Viewer State
   const [selectedTicketForQr, setSelectedTicketForQr] = useState(null);
+  const [passViewMode, setPassViewMode] = useState("dual"); // "dual", "barcode", "qr"
 
   useEffect(() => {
     fetchInitialData();
@@ -201,6 +203,7 @@ export default function TicketManager() {
       { header: "Recipient Email", key: "recipientEmail" },
       { header: "Ticket Type", key: "ticketType" },
       { header: "Status", key: "status" },
+      { header: "Barcode (Code 128)", key: "ticketCode" },
       {
         header: "QR Scanner URL",
         key: (t) => `${window.location.origin}/verify/${t.ticketCode}`,
@@ -653,10 +656,10 @@ export default function TicketManager() {
         </div>
       )}
 
-      {/* QR Code Pass Viewer & Print Modal */}
+      {/* QR Code & Barcode Pass Viewer & Print Modal */}
       {selectedTicketForQr && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-neutral-950 border-2 border-amber-500/50 rounded-3xl max-w-sm w-full p-6 shadow-2xl relative text-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-neutral-950 border-2 border-amber-500/50 rounded-3xl max-w-md w-full p-6 shadow-2xl relative text-center my-6">
             <button
               onClick={() => setSelectedTicketForQr(null)}
               className="absolute top-4 right-4 text-slate-400 hover:text-white text-xl font-bold p-1"
@@ -665,7 +668,7 @@ export default function TicketManager() {
             </button>
 
             {/* Ticket Header */}
-            <div className="flex items-center justify-center gap-3 mb-4">
+            <div className="flex items-center justify-center gap-3 mb-3">
               <img
                 src="/enactus-logo.png"
                 alt="Enactus"
@@ -673,18 +676,61 @@ export default function TicketManager() {
               />
               <div className="text-left">
                 <div className="text-xs font-bold uppercase tracking-wider text-amber-400">Enactus Official Pass</div>
-                <div className="text-sm font-extrabold text-white">Concert Admission</div>
+                <div className="text-sm font-extrabold text-white">Concert & Event Admission</div>
               </div>
             </div>
 
-            {/* QR Code Container */}
-            <div className="bg-white p-4 rounded-2xl inline-block shadow-inner mb-4">
-              <QRCodeSVG
-                value={`${window.location.origin}/verify/${selectedTicketForQr.ticketCode}`}
-                size={200}
-                level="H"
-                includeMargin={false}
-              />
+            {/* View Selector Tabs */}
+            <div className="flex justify-center gap-1 mb-4 bg-neutral-900 p-1 rounded-xl border border-neutral-800 text-xs">
+              <button
+                onClick={() => setPassViewMode("dual")}
+                className={`px-3 py-1 rounded-lg font-semibold transition ${
+                  passViewMode === "dual" ? "bg-amber-500 text-black font-bold" : "text-neutral-400 hover:text-white"
+                }`}
+              >
+                Dual (Barcode + QR)
+              </button>
+              <button
+                onClick={() => setPassViewMode("barcode")}
+                className={`px-3 py-1 rounded-lg font-semibold transition ${
+                  passViewMode === "barcode" ? "bg-amber-500 text-black font-bold" : "text-neutral-400 hover:text-white"
+                }`}
+              >
+                1D Barcode
+              </button>
+              <button
+                onClick={() => setPassViewMode("qr")}
+                className={`px-3 py-1 rounded-lg font-semibold transition ${
+                  passViewMode === "qr" ? "bg-amber-500 text-black font-bold" : "text-neutral-400 hover:text-white"
+                }`}
+              >
+                2D QR Code
+              </button>
+            </div>
+
+            {/* Barcode & QR Code Display */}
+            <div className="bg-white p-4 rounded-2xl shadow-inner mb-4 flex flex-col items-center justify-center gap-3">
+              {(passViewMode === "dual" || passViewMode === "barcode") && (
+                <div className="w-full flex justify-center">
+                  <BarcodeDisplay
+                    value={selectedTicketForQr.ticketCode}
+                    width={2}
+                    height={55}
+                    fontSize={13}
+                  />
+                </div>
+              )}
+
+              {(passViewMode === "dual" || passViewMode === "qr") && (
+                <div className="p-2 bg-white rounded-xl inline-block">
+                  <QRCodeSVG
+                    value={`${window.location.origin}/verify/${selectedTicketForQr.ticketCode}`}
+                    size={passViewMode === "dual" ? 140 : 190}
+                    level="H"
+                    includeMargin={false}
+                  />
+                </div>
+              )}
             </div>
 
             {/* Ticket Information */}
@@ -711,7 +757,7 @@ export default function TicketManager() {
               </div>
 
               <p className="text-[11px] text-neutral-400 leading-tight">
-                Scan with any phone camera or Play Store QR scanner app to admit attendee.
+                Scan with any phone camera, laser barcode gun, or Play Store QR/Barcode app.
                 <br />
                 <span className="text-amber-400 font-semibold">One-time use: Re-scanning is permanently blocked!</span>
               </p>

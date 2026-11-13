@@ -109,8 +109,12 @@ const TicketController = {
       }
 
       const formattedCode = ticketCode.trim().toUpperCase();
-      const ticket = await Ticket.findOne({ ticketCode: formattedCode })
-        .populate("event", "title date location");
+      const ticket = await Ticket.findOne({
+        $or: [
+          { ticketCode: formattedCode },
+          { ticketCode: formattedCode.startsWith("ENACTUS-") ? formattedCode : `ENACTUS-${formattedCode}` },
+        ],
+      }).populate("event", "title date location");
 
       if (!ticket) {
         return res.status(404).json({
@@ -173,8 +177,12 @@ const TicketController = {
       }
 
       const formattedCode = code.trim().toUpperCase();
-      const ticket = await Ticket.findOne({ ticketCode: formattedCode })
-        .populate("event", "title date location");
+      const ticket = await Ticket.findOne({
+        $or: [
+          { ticketCode: formattedCode },
+          { ticketCode: formattedCode.startsWith("ENACTUS-") ? formattedCode : `ENACTUS-${formattedCode}` },
+        ],
+      }).populate("event", "title date location");
 
       if (!ticket) {
         return res.status(404).json({

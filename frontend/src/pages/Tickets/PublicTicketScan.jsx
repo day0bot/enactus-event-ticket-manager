@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { format } from "date-fns";
-import { Html5Qrcode } from "html5-qrcode";
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
+import BarcodeDisplay from "../../components/BarcodeDisplay.jsx";
 
 export default function PublicTicketScan() {
   const { code } = useParams();
@@ -77,14 +78,34 @@ export default function PublicTicketScan() {
     let html5QrCode = null;
 
     if (isCameraActive && !result && !loading) {
+      const formatsToSupport = [
+        Html5QrcodeSupportedFormats.QR_CODE,
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.CODABAR,
+        Html5QrcodeSupportedFormats.ITF,
+        Html5QrcodeSupportedFormats.PDF_417,
+      ];
+
       const config = {
         fps: 15,
-        qrbox: { width: 250, height: 250 },
+        qrbox: (viewfinderWidth, viewfinderHeight) => {
+          // Rectangular box suited for both 1D barcodes and 2D QR codes
+          const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+          return {
+            width: Math.min(Math.floor(viewfinderWidth * 0.9), 320),
+            height: Math.min(Math.floor(minEdge * 0.65), 180),
+          };
+        },
         aspectRatio: 1.0,
       };
 
       try {
-        html5QrCode = new Html5Qrcode("qr-reader");
+        html5QrCode = new Html5Qrcode("qr-reader", { formatsToSupport, verbose: false });
         scannerRef.current = html5QrCode;
 
         html5QrCode
@@ -250,6 +271,10 @@ export default function PublicTicketScan() {
                   <span>Admitted: {format(new Date(), "h:mm:ss a")}</span>
                   <span className="font-bold text-white uppercase bg-emerald-700/80 px-2 py-0.5 rounded">Used</span>
                 </div>
+
+                <div className="pt-2 border-t border-white/10 flex flex-col items-center justify-center">
+                  <BarcodeDisplay value={result.ticket.ticketCode} width={1.8} height={40} fontSize={12} className="!bg-white/95" />
+                </div>
               </div>
             )}
 
@@ -389,7 +414,7 @@ export default function PublicTicketScan() {
           <form onSubmit={handleManualSubmit} className="flex gap-2">
             <input
               type="text"
-              placeholder="Or type code (e.g. ENACTUS-A1B2C3)..."
+              placeholder="Scan Barcode (Laser gun), Camera, or Type Code..."
               value={inputCode}
               onChange={(e) => setInputCode(e.target.value.toUpperCase())}
               className="flex-1 bg-black/50 border border-white/20 rounded-xl px-4 py-3 text-base font-mono font-bold text-white placeholder-white/50 focus:outline-none focus:border-amber-400 uppercase"

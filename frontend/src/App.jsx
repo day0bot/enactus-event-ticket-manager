@@ -1,5 +1,5 @@
 import Navbar from "./components/navbar.jsx";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, useLocation } from "react-router-dom";
 import HomePage from "./pages/HomePage.jsx";
 import Register from "./pages/Auth/register.jsx";
 import Login from "./pages/Auth/login.jsx";
@@ -27,20 +27,29 @@ import EventAnalytics from "./pages/Event/EventAnalytics.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import ForgotPassword from "./pages/Auth/ForgotPassword.jsx";
 
+function NavbarWrapper() {
+    const location = useLocation();
+    if (location.pathname.startsWith('/verify') || location.pathname.startsWith('/validator')) {
+        return null;
+    }
+    return <Navbar />;
+}
+
 function App() {
     return (
         <AuthProvider>
-            <Navbar />
+            <NavbarWrapper />
             <Routes>
-                {/* Public Routes */}
+                {/* Public Routes - ZERO Login Required */}
                 <Route path="/" element={<HomePage />} />
+                <Route path="/verify/:code" element={<PublicTicketScan />} />
+                <Route path="/validator" element={<PublicTicketScan />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/contact" element={<Contact />} />
                 <Route path="/events" element={<ProtectedRoute requireAuth={false}><EventList /></ProtectedRoute>} />
                 <Route path="/events/:id" element={<ProtectedRoute requireAuth={false}><EventDetails /></ProtectedRoute>} />
-                <Route path="/verify/:code" element={<PublicTicketScan />} />
                 <Route path="/tickets" element={<ProtectedRoute><TicketManager /></ProtectedRoute>} />
                 <Route path="/unauthorized" element={<UnauthorizedPage />} />
 

@@ -34,6 +34,9 @@ export default function TicketManager() {
   const [selectedTicketForQr, setSelectedTicketForQr] = useState(null);
   const [passViewMode, setPassViewMode] = useState("dual"); // "dual", "barcode", "qr"
 
+  // Canva Bulk Integration state
+  const [isCanvaModalOpen, setIsCanvaModalOpen] = useState(false);
+
   useEffect(() => {
     fetchInitialData();
   }, []);
@@ -219,6 +222,46 @@ export default function TicketManager() {
     toast.success(`Exported ${filteredTickets.length} tickets to CSV successfully!`);
   };
 
+  // Export specifically formatted for Canva Bulk Create with image placeholders
+  const handleExportCanvaCsv = () => {
+    if (!filteredTickets || filteredTickets.length === 0) {
+      toast.info("No tickets to export for Canva");
+      return;
+    }
+
+    const columns = [
+      { header: "Attendee_Name", key: (t) => t.recipientName || "Guest" },
+      { header: "Ticket_Code", key: "ticketCode" },
+      { header: "Event_Title", key: (t) => t.event?.title || "Enactus Event" },
+      {
+        header: "Event_Date",
+        key: (t) => (t.event?.date ? format(new Date(t.event.date), "PPP") : "TBA"),
+      },
+      { header: "Venue", key: (t) => t.event?.location || "TBA" },
+      { header: "Ticket_Tier", key: "ticketType" },
+      {
+        header: "QR_Code_Image",
+        key: (t) =>
+          `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(
+            `${window.location.origin}/verify/${t.ticketCode}`
+          )}`,
+      },
+      {
+        header: "Barcode_Image",
+        key: (t) => `https://barcodeapi.org/api/128/${t.ticketCode}`,
+      },
+      {
+        header: "Validation_URL",
+        key: (t) => `${window.location.origin}/verify/${t.ticketCode}`,
+      },
+      { header: "Status", key: "status" },
+    ];
+
+    const filename = `canva_bulk_tickets_${format(new Date(), "yyyyMMdd_HHmm")}`;
+    exportToCsv(filename, filteredTickets, columns);
+    toast.success(`Exported ${filteredTickets.length} Canva Bulk Create tickets!`);
+  };
+
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto space-y-8">
@@ -259,6 +302,13 @@ export default function TicketManager() {
               className="flex-1 sm:flex-none inline-flex items-center justify-center px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-xl shadow-lg transition-all"
             >
               + Create Tickets
+            </button>
+            <button
+              onClick={() => setIsCanvaModalOpen(true)}
+              className="flex-1 sm:flex-none inline-flex items-center justify-center px-4 py-2.5 bg-gradient-to-r from-teal-500 to-indigo-600 hover:from-teal-400 hover:to-indigo-500 text-white font-bold rounded-xl shadow-lg transition-all"
+              title="Bulk create duplicated ticket designs in Canva"
+            >
+              🎨 Canva Bulk Create
             </button>
             <button
               onClick={handleExportCsv}
@@ -776,6 +826,119 @@ export default function TicketManager() {
                 className="flex-1 py-2.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-semibold rounded-xl text-xs transition border border-neutral-700"
               >
                 Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Canva Bulk Template Integration Modal */}
+      {isCanvaModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-neutral-950 border border-teal-500/50 rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl relative my-6">
+            <button
+              onClick={() => setIsCanvaModalOpen(false)}
+              className="absolute top-5 right-5 text-slate-400 hover:text-white text-xl font-bold p-1"
+            >
+              ✕
+            </button>
+
+            {/* Header */}
+            <div className="flex items-center gap-3 mb-6 pb-4 border-b border-neutral-800">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-teal-500 to-indigo-600 flex items-center justify-center text-white text-2xl font-black shadow-lg">
+                🎨
+              </div>
+              <div>
+                <h2 className="text-xl sm:text-2xl font-black text-white">Canva Bulk Template Generator</h2>
+                <p className="text-xs text-neutral-400">
+                  Duplicate a single Canva template for hundreds of tickets with auto-replaced barcodes and QR codes
+                </p>
+              </div>
+            </div>
+
+            {/* Download CTA Card */}
+            <div className="bg-gradient-to-r from-teal-950/40 via-neutral-900 to-indigo-950/40 border border-teal-500/30 p-5 rounded-2xl mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div>
+                <div className="text-sm font-bold text-white">
+                  Export {filteredTickets.length} Tickets for Canva
+                </div>
+                <div className="text-xs text-neutral-400 mt-0.5">
+                  Pre-configured with direct PNG image URLs for barcodes and QR codes.
+                </div>
+              </div>
+              <button
+                onClick={handleExportCanvaCsv}
+                className="w-full sm:w-auto px-5 py-3 bg-gradient-to-r from-teal-500 to-indigo-600 hover:from-teal-400 hover:to-indigo-500 text-white font-bold rounded-xl text-xs transition shadow-lg whitespace-nowrap active:scale-95"
+              >
+                📥 Download Canva CSV
+              </button>
+            </div>
+
+            {/* Step by Step Guide */}
+            <div className="space-y-4 text-left">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-amber-400">
+                How to Duplicate Your Template in Canva:
+              </h3>
+
+              <div className="bg-neutral-900/80 border border-neutral-800 rounded-2xl p-4 space-y-3 text-xs text-neutral-300">
+                <div className="flex gap-3">
+                  <span className="w-6 h-6 rounded-full bg-teal-500/20 text-teal-400 font-bold flex items-center justify-center flex-shrink-0">
+                    1
+                  </span>
+                  <div>
+                    <strong className="text-white">Design your Ticket in Canva:</strong>
+                    <p className="text-neutral-400 mt-0.5">
+                      Create your ticket layout. For the barcode/QR code, add an <strong>Image Frame</strong> (from <em>Elements &rarr; Frames</em>). Add text placeholders for Name and Code.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <span className="w-6 h-6 rounded-full bg-teal-500/20 text-teal-400 font-bold flex items-center justify-center flex-shrink-0">
+                    2
+                  </span>
+                  <div>
+                    <strong className="text-white">Open Canva "Bulk Create":</strong>
+                    <p className="text-neutral-400 mt-0.5">
+                      In Canva's left side menu, click <strong>Apps</strong> &rarr; search for <strong>Bulk Create</strong> &rarr; click <strong>Upload CSV</strong> and select the downloaded file.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <span className="w-6 h-6 rounded-full bg-teal-500/20 text-teal-400 font-bold flex items-center justify-center flex-shrink-0">
+                    3
+                  </span>
+                  <div>
+                    <strong className="text-white">Connect Placeholders ("Connect Data"):</strong>
+                    <p className="text-neutral-400 mt-0.5">
+                      Right-click your text &rarr; <strong>Connect data</strong> &rarr; select <code className="text-amber-400">Attendee_Name</code> or <code className="text-amber-400">Ticket_Code</code>.
+                      <br />
+                      Right-click the Image Frame &rarr; <strong>Connect data</strong> &rarr; select <code className="text-teal-400">QR_Code_Image</code> or <code className="text-teal-400">Barcode_Image</code>.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <span className="w-6 h-6 rounded-full bg-teal-500/20 text-teal-400 font-bold flex items-center justify-center flex-shrink-0">
+                    4
+                  </span>
+                  <div>
+                    <strong className="text-white">Click "Generate Pages":</strong>
+                    <p className="text-neutral-400 mt-0.5">
+                      Canva automatically creates duplicated pages for all attendees with each person's unique scannable barcode or QR code inserted automatically!
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-neutral-800 flex justify-end">
+              <button
+                onClick={() => setIsCanvaModalOpen(false)}
+                className="px-6 py-2.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-semibold rounded-xl text-xs transition"
+              >
+                Close Guide
               </button>
             </div>
           </div>

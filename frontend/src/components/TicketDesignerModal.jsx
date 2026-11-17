@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import JsBarcode from "jsbarcode";
 import QRCode from "qrcode";
+import { toast } from "react-toastify";
 
 /* ── Placeholder type definitions ────────────────────────────── */
 const PH_TYPES = [
@@ -204,20 +205,31 @@ export default function TicketDesignerModal({ isOpen, onClose, tickets = [] }) {
 
   /* ── Upload Handler ──────────────────────────────────────── */
   const onFile = useCallback((file) => {
-    if (!file || !file.type.startsWith("image/")) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        setTplSize({ w: img.naturalWidth, h: img.naturalHeight });
-        setTplSrc(e.target.result);
-        setPhs([]);
-        setStep(2);
-      };
-      img.src = e.target.result;
+    if (!file || !file.type.startsWith("image/")) {
+      toast.warning("Please upload a valid image file (PNG, JPG, or WebP).");
+      return;
+    }
+
+    // Clean up previous blob URL if exists to free memory
+    if (tplSrc && tplSrc.startsWith("blob:")) {
+      try { URL.revokeObjectURL(tplSrc); } catch {}
+    }
+
+    // Use lightweight Blob Object URL instead of gigantic base64 strings
+    // to avoid V8's string limit (RangeError: Invalid string length)
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      setTplSize({ w: img.naturalWidth, h: img.naturalHeight });
+      setTplSrc(objectUrl);
+      setPhs([]);
+      setStep(2);
     };
-    reader.readAsDataURL(file);
-  }, []);
+    img.onerror = () => {
+      toast.error("Could not load image. Please try another image file.");
+    };
+    img.src = objectUrl;
+  }, [tplSrc]);
 
   const onDrop = useCallback((e) => {
     e.preventDefault();
@@ -358,97 +370,98 @@ export default function TicketDesignerModal({ isOpen, onClose, tickets = [] }) {
     setGenProgress(0);
     setStep(3);
 
-    const hasQR = phs.some((p) => p.type === "qr_code");
-    const hasBC = phs.some((p) => p.type === "barcode");
-    const data = [];
-    const BATCH = 15;
+    try {
+      const hasQR = phs.some((p) => p.type === "qr_code");
+      const hasBC = phs.some((p) => p.type === "barcode");
+      const data = [];
+      const BATCH = 20;
 
-    // Generate QR codes and Barcodes for all tickets client-side
-    for (let i = 0; i < tickets.length; i += BATCH) {
-      const batch = tickets.slice(i, i + BATCH);
-      const batchResults = await Promise.all(
-        batch.map(async (t) => {
-          const d = { ...t, _qr: null, _bc: null };
-          if (hasQR) {
-            d._qr = await qrDataURL(`${window.location.origin}/verify/${t.ticketCode}`, 350);
-          }
-          if (hasBC) {
-            d._bc = barcodeDataURL(t.ticketCode);
-          }
-          return d;
-        })
-      );
-      data.push(...batchResults);
-      setGenProgress(Math.round((data.length / tickets.length) * 85));
-    }
-
-    setGenProgress(94);
-
-    // Build print HTML document
-    const { cols, rows, tw, th, total: perPage, orient, pageW, pageH, M, G } = layout;
-    const pageCount = Math.ceil(data.length / perPage);
-    let pagesHtml = "";
-
-    for (let p = 0; p < pageCount; p++) {
-      const slice = data.slice(p * perPage, (p + 1) * perPage);
-      let cardsHtml = "";
-
-      for (const t of slice) {
-        let overlaysHtml = "";
-        for (const ph of phs) {
-          const l = (ph.x / 100) * tw;
-          const top = (ph.y / 100) * th;
-          const w = (ph.w / 100) * tw;
-          const h = (ph.h / 100) * th;
-
-          if (ph.type === "qr_code") {
-            if (t._qr) {
-              overlaysHtml += `
-                <div style="position:absolute;left:${l.toFixed(2)}mm;top:${top.toFixed(2)}mm;width:${w.toFixed(2)}mm;height:${h.toFixed(2)}mm;display:flex;align-items:center;justify-content:center;background:#ffffff;padding:1mm;border-radius:1.5mm;box-sizing:border-box;">
-                  <img src="${t._qr}" style="width:100%;height:100%;object-fit:contain;display:block;" />
-                </div>
-              `;
+      // Generate QR codes and Barcodes for all tickets client-side
+      for (let i = 0; i < tickets.length; i += BATCH) {
+        const batch = tickets.slice(i, i + BATCH);
+        const batchResults = await Promise.all(
+          batch.map(async (t) => {
+            const d = { ...t, _qr: null, _bc: null };
+            if (hasQR) {
+              d._qr = await qrDataURL(`${window.location.origin}/verify/${t.ticketCode}`, 300);
             }
-          } else if (ph.type === "barcode") {
-            if (t._bc) {
-              overlaysHtml += `
-                <div style="position:absolute;left:${l.toFixed(2)}mm;top:${top.toFixed(2)}mm;width:${w.toFixed(2)}mm;height:${h.toFixed(2)}mm;display:flex;align-items:center;justify-content:center;background:#ffffff;padding:1mm;border-radius:1.5mm;box-sizing:border-box;">
-                  <img src="${t._bc}" style="width:100%;height:100%;object-fit:contain;display:block;" />
-                </div>
-              `;
+            if (hasBC) {
+              d._bc = barcodeDataURL(t.ticketCode);
             }
-          } else {
-            // Text overlays
-            const fontSizeMm = Math.max(2.2, h * 0.52);
-            overlaysHtml += `
-              <div style="position:absolute;left:${l.toFixed(2)}mm;top:${top.toFixed(2)}mm;width:${w.toFixed(2)}mm;height:${h.toFixed(2)}mm;display:flex;align-items:center;justify-content:center;font-size:${fontSizeMm.toFixed(2)}mm;font-weight:800;color:${ph.textColor || "#ffffff"};text-shadow:0 1px 2px rgba(0,0,0,0.8),0 0 1px rgba(0,0,0,0.9);text-align:center;overflow:hidden;line-height:1.15;word-break:break-word;font-family:'Segoe UI',Arial,sans-serif;">
-                ${escHTML(ticketValue(t, ph.type))}
-              </div>
-            `;
-          }
-        }
-
-        // CRITICAL FIX: The background image MUST be an <img> element, NOT CSS background!
-        // Browsers strip CSS background-image during printing by default.
-        // An <img> tag is guaranteed to print on every browser, printer, and PDF exporter!
-        cardsHtml += `
-          <div class="tk" style="position:relative;width:${tw.toFixed(2)}mm;height:${th.toFixed(2)}mm;overflow:hidden;box-sizing:border-box;border-radius:2mm;">
-            <img src="${tplSrc}" class="tk-bg" style="position:absolute;left:0;top:0;width:100%;height:100%;object-fit:fill;z-index:1;display:block;" />
-            <div class="tk-layer" style="position:absolute;left:0;top:0;width:100%;height:100%;z-index:2;">
-              ${overlaysHtml}
-            </div>
-          </div>
-        `;
+            return d;
+          })
+        );
+        data.push(...batchResults);
+        setGenProgress(Math.min(90, Math.round((data.length / tickets.length) * 85)));
       }
 
-      pagesHtml += `
-        <div class="pg">
-          ${cardsHtml}
-        </div>
-      `;
-    }
+      setGenProgress(94);
 
-    const printDocHtml = `<!DOCTYPE html>
+      // Build print HTML document using array joins instead of repeated string concatenation
+      const { cols, rows, tw, th, total: perPage, orient, pageW, pageH, M, G } = layout;
+      const pageCount = Math.ceil(data.length / perPage);
+      const allPages = [];
+
+      for (let p = 0; p < pageCount; p++) {
+        const slice = data.slice(p * perPage, (p + 1) * perPage);
+        const pageCards = [];
+
+        for (const t of slice) {
+          const overlays = [];
+          for (const ph of phs) {
+            const l = (ph.x / 100) * tw;
+            const top = (ph.y / 100) * th;
+            const w = (ph.w / 100) * tw;
+            const h = (ph.h / 100) * th;
+
+            if (ph.type === "qr_code") {
+              if (t._qr) {
+                overlays.push(`
+                  <div style="position:absolute;left:${l.toFixed(2)}mm;top:${top.toFixed(2)}mm;width:${w.toFixed(2)}mm;height:${h.toFixed(2)}mm;display:flex;align-items:center;justify-content:center;background:#ffffff;padding:1mm;border-radius:1.5mm;box-sizing:border-box;">
+                    <img src="${t._qr}" style="width:100%;height:100%;object-fit:contain;display:block;" />
+                  </div>
+                `);
+              }
+            } else if (ph.type === "barcode") {
+              if (t._bc) {
+                overlays.push(`
+                  <div style="position:absolute;left:${l.toFixed(2)}mm;top:${top.toFixed(2)}mm;width:${w.toFixed(2)}mm;height:${h.toFixed(2)}mm;display:flex;align-items:center;justify-content:center;background:#ffffff;padding:1mm;border-radius:1.5mm;box-sizing:border-box;">
+                    <img src="${t._bc}" style="width:100%;height:100%;object-fit:contain;display:block;" />
+                  </div>
+                `);
+              }
+            } else {
+              // Text overlays
+              const fontSizeMm = Math.max(2.2, h * 0.52);
+              overlays.push(`
+                <div style="position:absolute;left:${l.toFixed(2)}mm;top:${top.toFixed(2)}mm;width:${w.toFixed(2)}mm;height:${h.toFixed(2)}mm;display:flex;align-items:center;justify-content:center;font-size:${fontSizeMm.toFixed(2)}mm;font-weight:800;color:${ph.textColor || "#ffffff"};text-shadow:0 1px 2px rgba(0,0,0,0.8),0 0 1px rgba(0,0,0,0.9);text-align:center;overflow:hidden;line-height:1.15;word-break:break-word;font-family:'Segoe UI',Arial,sans-serif;">
+                  ${escHTML(ticketValue(t, ph.type))}
+                </div>
+              `);
+            }
+          }
+
+          // Use Blob URL which is ~40 bytes per card, avoiding V8's string memory limit
+          pageCards.push(`
+            <div class="tk" style="position:relative;width:${tw.toFixed(2)}mm;height:${th.toFixed(2)}mm;overflow:hidden;box-sizing:border-box;border-radius:2mm;">
+              <img src="${tplSrc}" class="tk-bg" style="position:absolute;left:0;top:0;width:100%;height:100%;object-fit:fill;z-index:1;display:block;" />
+              <div class="tk-layer" style="position:absolute;left:0;top:0;width:100%;height:100%;z-index:2;">
+                ${overlays.join("")}
+              </div>
+            </div>
+          `);
+        }
+
+        allPages.push(`
+          <div class="pg">
+            ${pageCards.join("")}
+          </div>
+        `);
+      }
+
+      setGenProgress(98);
+
+      const printDocHtml = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
@@ -550,10 +563,10 @@ export default function TicketDesignerModal({ isOpen, onClose, tickets = [] }) {
     </div>
   </div>
 
-  ${pagesHtml}
+  ${allPages.join("")}
 
   <script>
-    // Wait for all images (backgrounds + barcodes + QRs) to fully load before triggering print
+    // Wait for all images to resolve in memory before triggering print
     window.onload = function() {
       var imgs = Array.from(document.images);
       var promises = imgs.map(function(img) {
@@ -571,16 +584,22 @@ export default function TicketDesignerModal({ isOpen, onClose, tickets = [] }) {
 </body>
 </html>`;
 
-    setGenProgress(100);
+      setGenProgress(100);
 
-    const printWin = window.open("", "_blank");
-    if (printWin) {
-      printWin.document.open();
-      printWin.document.write(printDocHtml);
-      printWin.document.close();
+      const printWin = window.open("", "_blank");
+      if (printWin) {
+        printWin.document.open();
+        printWin.document.write(printDocHtml);
+        printWin.document.close();
+      } else {
+        toast.warning("Pop-up was blocked. Please allow pop-ups for this site so the print window can open.");
+      }
+    } catch (err) {
+      console.error("Print generation error:", err);
+      toast.error("Generation error: " + err.message);
+    } finally {
+      setTimeout(() => setIsGen(false), 500);
     }
-
-    setTimeout(() => setIsGen(false), 600);
   };
 
   if (!isOpen) return null;

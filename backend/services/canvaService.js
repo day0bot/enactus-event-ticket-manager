@@ -1,4 +1,3 @@
-import axios from "axios";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -7,6 +6,7 @@ const CANVA_API_BASE = "https://api.canva.com/v1";
 
 /**
  * Service to interact directly with Canva Connect API (Autofill & Design APIs)
+ * Uses native fetch for zero-dependency reliability in all environments (local & Vercel)
  */
 export const CanvaService = {
   /**
@@ -21,23 +21,26 @@ export const CanvaService = {
    */
   uploadAssetToCanva: async (token, imageBuffer, fileName = "ticket-code.png") => {
     try {
-      const response = await axios.post(
-        `${CANVA_API_BASE}/asset-uploads`,
-        imageBuffer,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/octet-stream",
-            "Asset-Upload-Metadata": JSON.stringify({
-              name_base64: Buffer.from(fileName).toString("base64"),
-            }),
-          },
-        }
-      );
-      return response.data;
+      const response = await fetch(`${CANVA_API_BASE}/asset-uploads`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/octet-stream",
+          "Asset-Upload-Metadata": JSON.stringify({
+            name_base64: Buffer.from(fileName).toString("base64"),
+          }),
+        },
+        body: imageBuffer,
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || `Canva upload failed with status ${response.status}`);
+      }
+      return data;
     } catch (err) {
-      console.error("Canva asset upload error:", err.response?.data || err.message);
-      throw new Error(err.response?.data?.message || "Failed to upload asset to Canva");
+      console.error("Canva asset upload error:", err.message);
+      throw err;
     }
   },
 
@@ -78,23 +81,30 @@ export const CanvaService = {
       });
 
       // Call Canva Autofill API
-      const autofillResponse = await axios.post(
-        `${CANVA_API_BASE}/autofills`,
-        {
+      const response = await fetch(`${CANVA_API_BASE}/autofills`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
           brand_template_id: templateId,
           title: `Enactus Tickets - Batch (${tickets.length} attendees)`,
           data: dataset[0], // Primary page
           pages: dataset,   // Duplicated pages for large batches
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
+        }),
+      });
 
-      const job = autofillResponse.data?.job || autofillResponse.data;
+      const data = await response.json();
+      if (!response.ok) {
+        return {
+          success: false,
+          error: data.message || `Canva Autofill error: ${response.status}`,
+          details: data,
+        };
+      }
+
+      const job = data?.job || data;
       const designId = job.result?.design?.id || job.design?.id;
       const designUrl = job.result?.design?.url || `https://www.canva.com/design/${designId}/edit`;
 
@@ -107,11 +117,10 @@ export const CanvaService = {
         message: `Successfully generated ${tickets.length} duplicated ticket pages in Canva!`,
       };
     } catch (err) {
-      console.error("Canva Autofill error:", err.response?.data || err.message);
+      console.error("Canva Autofill error:", err.message);
       return {
         success: false,
-        error: err.response?.data?.message || err.message,
-        details: err.response?.data,
+        error: err.message,
       };
     }
   },

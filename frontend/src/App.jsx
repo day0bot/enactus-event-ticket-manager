@@ -26,10 +26,11 @@ import 'react-toastify/dist/ReactToastify.css';
 import EventAnalytics from "./pages/Event/EventAnalytics.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import ForgotPassword from "./pages/Auth/ForgotPassword.jsx";
+import CanvaCallback from "./pages/CanvaCallback.jsx";
 
 function NavbarWrapper() {
     const location = useLocation();
-    if (location.pathname.startsWith('/verify') || location.pathname.startsWith('/validator')) {
+    if (location.pathname.startsWith('/verify') || location.pathname.startsWith('/validator') || location.pathname.startsWith('/canva/callback')) {
         return null;
     }
     return <Navbar />;
@@ -44,6 +45,7 @@ function App() {
                 <Route path="/" element={<HomePage />} />
                 <Route path="/verify/:code" element={<PublicTicketScan />} />
                 <Route path="/validator" element={<PublicTicketScan />} />
+                <Route path="/canva/callback" element={<CanvaCallback />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />

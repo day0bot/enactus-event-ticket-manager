@@ -6,6 +6,7 @@ import { exportToCsv } from "../../utils/csvExport";
 import { format } from "date-fns";
 import { QRCodeSVG } from "qrcode.react";
 import BarcodeDisplay from "../../components/BarcodeDisplay.jsx";
+import CanvaIntegrationModal from "../../components/CanvaIntegrationModal.jsx";
 
 export default function TicketManager() {
   const [searchParams] = useSearchParams();
@@ -34,13 +35,8 @@ export default function TicketManager() {
   const [selectedTicketForQr, setSelectedTicketForQr] = useState(null);
   const [passViewMode, setPassViewMode] = useState("dual"); // "dual", "barcode", "qr"
 
-  // Canva Bulk Integration state
+  // Canva Integration state
   const [isCanvaModalOpen, setIsCanvaModalOpen] = useState(false);
-  const [canvaTemplateId, setCanvaTemplateId] = useState("");
-  const [canvaApiToken, setCanvaApiToken] = useState("");
-  const [canvaCodeType, setCanvaCodeType] = useState("both"); // "both", "qr", "barcode"
-  const [isCanvaProcessing, setIsCanvaProcessing] = useState(false);
-  const [canvaResult, setCanvaResult] = useState(null);
 
   useEffect(() => {
     fetchInitialData();
@@ -227,85 +223,6 @@ export default function TicketManager() {
     toast.success(`Exported ${filteredTickets.length} tickets to CSV successfully!`);
   };
 
-  // Export specifically formatted for Canva Bulk Create with image placeholders
-  const handleExportCanvaCsv = () => {
-    if (!filteredTickets || filteredTickets.length === 0) {
-      toast.info("No tickets to export for Canva");
-      return;
-    }
-
-    const columns = [
-      { header: "Attendee_Name", key: (t) => t.recipientName || "Guest" },
-      { header: "Ticket_Code", key: "ticketCode" },
-      { header: "Event_Title", key: (t) => t.event?.title || "Enactus Event" },
-      {
-        header: "Event_Date",
-        key: (t) => (t.event?.date ? format(new Date(t.event.date), "PPP") : "TBA"),
-      },
-      { header: "Venue", key: (t) => t.event?.location || "TBA" },
-      { header: "Ticket_Tier", key: "ticketType" },
-      {
-        header: "QR_Code_Image",
-        key: (t) =>
-          `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(
-            `${window.location.origin}/verify/${t.ticketCode}`
-          )}`,
-      },
-      {
-        header: "Barcode_Image",
-        key: (t) => `https://barcodeapi.org/api/128/${t.ticketCode}`,
-      },
-      {
-        header: "Validation_URL",
-        key: (t) => `${window.location.origin}/verify/${t.ticketCode}`,
-      },
-      { header: "Status", key: "status" },
-    ];
-
-    const filename = `canva_bulk_tickets_${format(new Date(), "yyyyMMdd_HHmm")}`;
-    exportToCsv(filename, filteredTickets, columns);
-    toast.success(`Exported ${filteredTickets.length} Canva Bulk Create tickets!`);
-  };
-
-  // Run automated Canva API duplication & placeholder injection
-  const handleRunCanvaIntegration = async (e) => {
-    e.preventDefault();
-    if (!canvaTemplateId.trim()) {
-      toast.error("Please enter your Canva Template ID or Design URL");
-      return;
-    }
-
-    setIsCanvaProcessing(true);
-    setCanvaResult(null);
-
-    try {
-      const payload = {
-        templateId: canvaTemplateId.trim(),
-        ticketIds: filteredTickets.map((t) => t._id),
-        codeType: canvaCodeType,
-        apiToken: canvaApiToken.trim() || undefined,
-      };
-
-      const res = await axios.post("/canva/generate-batch", payload);
-      setCanvaResult(res.data);
-      if (res.data?.success) {
-        toast.success(res.data.message || "Canva designs generated successfully!");
-      } else {
-        toast.warning(res.data?.message || "Canva batch processing notification");
-      }
-    } catch (err) {
-      console.error("Canva integration error:", err);
-      const errMsg = err.response?.data?.message || err.message || "Failed to process Canva batch";
-      setCanvaResult({
-        success: false,
-        error: errMsg,
-        requiresAuth: err.response?.data?.requiresAuth,
-      });
-      toast.error(errMsg);
-    } finally {
-      setIsCanvaProcessing(false);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 py-8 px-4 sm:px-6 lg:px-8">
@@ -877,153 +794,14 @@ export default function TicketManager() {
         </div>
       )}
 
-      {/* Canva Bulk Template Integration Modal */}
-      {isCanvaModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="bg-neutral-950 border border-teal-500/50 rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl relative my-6 text-left">
-            <button
-              onClick={() => setIsCanvaModalOpen(false)}
-              className="absolute top-5 right-5 text-slate-400 hover:text-white text-xl font-bold p-1"
-            >
-              ✕
-            </button>
-
-            {/* Header */}
-            <div className="flex items-center gap-3 mb-6 pb-4 border-b border-neutral-800">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-teal-500 to-indigo-600 flex items-center justify-center text-white text-2xl font-black shadow-lg">
-                🎨
-              </div>
-              <div>
-                <h2 className="text-xl sm:text-2xl font-black text-white">Canva Direct Batch Generator</h2>
-                <p className="text-xs text-neutral-400">
-                  Programmatically duplicate a Canva template with auto-generated barcodes & QR codes
-                </p>
-              </div>
-            </div>
-
-            {/* Automation Form */}
-            <form onSubmit={handleRunCanvaIntegration} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-teal-400 mb-1.5">
-                  Canva Template / Design ID or URL *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. DAFxxxxxxx or paste Canva design URL..."
-                  value={canvaTemplateId}
-                  onChange={(e) => setCanvaTemplateId(e.target.value)}
-                  className="w-full bg-neutral-900 border border-neutral-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-teal-500"
-                />
-                <p className="text-[11px] text-neutral-400 mt-1">
-                  In Canva, open your template & copy the ID from the URL (e.g. <code>DAFabc123</code>).
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-neutral-300 mb-1.5">
-                    Placeholder Code Format
-                  </label>
-                  <select
-                    value={canvaCodeType}
-                    onChange={(e) => setCanvaCodeType(e.target.value)}
-                    className="w-full bg-neutral-900 border border-neutral-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-teal-500"
-                  >
-                    <option value="both">Both (Barcode + QR Code)</option>
-                    <option value="qr">QR Code (2D Scanner)</option>
-                    <option value="barcode">Barcode (1D Code 128)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-neutral-300 mb-1.5">
-                    Tickets to Generate
-                  </label>
-                  <div className="bg-neutral-900 border border-neutral-700 rounded-xl p-3 text-sm font-bold text-amber-400 flex items-center justify-between">
-                    <span>{filteredTickets.length} Attendees</span>
-                    <span className="text-xs text-neutral-400 font-normal">Auto-duplicated</span>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-neutral-300 mb-1.5">
-                  Canva API Token (Optional if set in server)
-                </label>
-                <input
-                  type="password"
-                  placeholder="Paste Canva Connect API Token..."
-                  value={canvaApiToken}
-                  onChange={(e) => setCanvaApiToken(e.target.value)}
-                  className="w-full bg-neutral-900 border border-neutral-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-teal-500"
-                />
-                <p className="text-[11px] text-neutral-400 mt-1">
-                  Get your free token at <a href="https://www.canva.com/developers/" target="_blank" rel="noreferrer" className="text-teal-400 underline">canva.com/developers</a>.
-                </p>
-              </div>
-
-              {/* Status / Result Card */}
-              {canvaResult && (
-                <div
-                  className={`p-4 rounded-2xl border text-xs space-y-2 ${
-                    canvaResult.success
-                      ? "bg-emerald-950/40 border-emerald-500/50 text-emerald-200"
-                      : "bg-amber-950/40 border-amber-500/50 text-amber-200"
-                  }`}
-                >
-                  <div className="font-bold text-sm flex items-center gap-1.5">
-                    <span>{canvaResult.success ? "✅" : "ℹ️"}</span>
-                    <span>{canvaResult.message || canvaResult.error}</span>
-                  </div>
-
-                  {canvaResult.designUrl && (
-                    <div className="pt-2">
-                      <a
-                        href={canvaResult.designUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-bold rounded-xl text-xs transition shadow"
-                      >
-                        🎨 Open Generated Tickets in Canva &rarr;
-                      </a>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Submit Buttons */}
-              <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-neutral-800">
-                <button
-                  type="submit"
-                  disabled={isCanvaProcessing || filteredTickets.length === 0}
-                  className="flex-1 py-3.5 bg-gradient-to-r from-teal-500 to-indigo-600 hover:from-teal-400 hover:to-indigo-500 text-white font-black rounded-xl text-sm transition shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95"
-                >
-                  {isCanvaProcessing ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                      <span>Processing in Canva...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>⚡ Generate & Duplicate in Canva</span>
-                    </>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleExportCanvaCsv}
-                  className="px-4 py-3 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 font-semibold rounded-xl text-xs border border-neutral-700 transition"
-                  title="Download CSV formatted with image stream URLs for Canva Bulk Create"
-                >
-                  📥 Export CSV
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Canva OAuth Integration Modal */}
+      <CanvaIntegrationModal
+        isOpen={isCanvaModalOpen}
+        onClose={() => setIsCanvaModalOpen(false)}
+        tickets={filteredTickets}
+        events={events}
+        selectedEventId={selectedEventId}
+      />
     </div>
   );
 }

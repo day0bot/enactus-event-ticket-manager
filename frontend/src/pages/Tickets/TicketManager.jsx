@@ -6,7 +6,7 @@ import { exportToCsv } from "../../utils/csvExport";
 import { format } from "date-fns";
 import { QRCodeSVG } from "qrcode.react";
 import BarcodeDisplay from "../../components/BarcodeDisplay.jsx";
-import CanvaIntegrationModal from "../../components/CanvaIntegrationModal.jsx";
+import TicketDesignerModal from "../../components/TicketDesignerModal.jsx";
 
 export default function TicketManager() {
   const [searchParams] = useSearchParams();
@@ -35,8 +35,8 @@ export default function TicketManager() {
   const [selectedTicketForQr, setSelectedTicketForQr] = useState(null);
   const [passViewMode, setPassViewMode] = useState("dual"); // "dual", "barcode", "qr"
 
-  // Canva Integration state
-  const [isCanvaModalOpen, setIsCanvaModalOpen] = useState(false);
+  // PNG Template Print Designer state
+  const [isDesignerModalOpen, setIsDesignerModalOpen] = useState(false);
 
   useEffect(() => {
     fetchInitialData();
@@ -266,11 +266,11 @@ export default function TicketManager() {
               + Create Tickets
             </button>
             <button
-              onClick={() => setIsCanvaModalOpen(true)}
-              className="flex-1 sm:flex-none inline-flex items-center justify-center px-4 py-2.5 bg-gradient-to-r from-teal-500 to-indigo-600 hover:from-teal-400 hover:to-indigo-500 text-white font-bold rounded-xl shadow-lg transition-all"
-              title="Bulk create duplicated ticket designs in Canva"
+              onClick={() => setIsDesignerModalOpen(true)}
+              className="flex-1 sm:flex-none inline-flex items-center justify-center px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-extrabold rounded-xl shadow-lg transition-all"
+              title="Upload PNG ticket design, drag & drop placeholders, and print on A4 paper"
             >
-              🎨 Canva Bulk Create
+              🖨️ Design & Print A4
             </button>
             <button
               onClick={handleExportCsv}
@@ -794,13 +794,11 @@ export default function TicketManager() {
         </div>
       )}
 
-      {/* Canva OAuth Integration Modal */}
-      <CanvaIntegrationModal
-        isOpen={isCanvaModalOpen}
-        onClose={() => setIsCanvaModalOpen(false)}
+      {/* PNG Template Drag-and-Drop Print Designer Modal */}
+      <TicketDesignerModal
+        isOpen={isDesignerModalOpen}
+        onClose={() => setIsDesignerModalOpen(false)}
         tickets={filteredTickets}
-        events={events}
-        selectedEventId={selectedEventId}
       />
     </div>
   );

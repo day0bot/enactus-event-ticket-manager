@@ -27,8 +27,8 @@ function barcodeDataURL(text, color = "#000000") {
     const c = document.createElement("canvas");
     JsBarcode(c, text, {
       format: "CODE128",
-      width: 2.8,
-      height: 85,
+      width: 2.6,
+      height: 80,
       displayValue: false,
       margin: 0, // Zero margin
       background: "transparent", // 100% transparent PNG
@@ -48,7 +48,7 @@ async function qrDataURL(text, size = 450, color = "#000000") {
   try {
     return await QRCode.toDataURL(text, {
       width: size,
-      margin: 0, // Zero margin / no white quiet zone box
+      margin: 0, // Zero margin / no white quiet-zone box
       color: {
         dark: color,
         light: "#00000000", // 100% transparent background (RGBA 0 alpha)
@@ -80,98 +80,102 @@ function escHTML(s) {
 }
 
 /**
- * Calculate A4 layout. Defaults to FULL A4 PAGE (1 ticket per page, full bleed 210x297 or 297x210)
+ * Computes the PERFECT RATIO grid for tickets on standard A4 paper (210 x 297 mm)
+ * Preserves the exact, natural aspect ratio of the uploaded ticket design without any distortion.
  */
-function computeA4Layout(tw, th, targetCount = "1") {
-  const aspect = tw / th; // width / height
-  const isLandscape = aspect >= 1;
-  const orient = isLandscape ? "landscape" : "portrait";
-  const pageW = isLandscape ? 297 : 210;
-  const pageH = isLandscape ? 210 : 297;
+function computeA4Layout(tw, th, choice = "auto") {
+  const aspect = tw / th; // original natural width / height ratio
+  const M = 8; // 8mm page margin
+  const G = 4; // 4mm cutting gap between tickets
 
-  // 1. FULL A4 PAGE (1 ticket per sheet, full bleed, 0 margins)
-  if (targetCount === "1") {
-    return {
-      cols: 1,
-      rows: 1,
-      tw: pageW,
-      th: pageH,
-      total: 1,
-      orient,
-      pageW,
-      pageH,
-      M: 0, // Zero margin: full A4 page!
-      G: 0,
-      score: pageW * pageH,
-    };
-  }
-
-  // 2. Multi-ticket layouts (optional packing)
-  const M = 6;
-  const G = 3;
   const pages = [
     { pageW: 210, pageH: 297, orient: "portrait" },
     { pageW: 297, pageH: 210, orient: "landscape" },
   ];
 
-  const presets = {
-    "2": [{ c: 1, r: 2 }, { c: 2, r: 1 }],
-    "3": [{ c: 1, r: 3 }, { c: 3, r: 1 }],
-    "4": [{ c: 2, r: 2 }, { c: 1, r: 4 }],
-    "6": [{ c: 2, r: 3 }, { c: 3, r: 2 }],
-    "8": [{ c: 2, r: 4 }, { c: 4, r: 2 }],
-  };
-
-  const candidates = [];
+  const allLayouts = [];
 
   for (const p of pages) {
     const usableW = p.pageW - 2 * M;
     const usableH = p.pageH - 2 * M;
 
-    if (presets[targetCount]) {
-      for (const { c, r } of presets[targetCount]) {
-        let w = (usableW - (c - 1) * G) / c;
-        let h = w / aspect;
-        if (r * h + (r - 1) * G > usableH) {
-          h = (usableH - (r - 1) * G) / r;
+    // Test practical ticket grids (cols 1..3, rows 1..6)
+    for (let c = 1; c <= 3; c++) {
+      for (let r = 1; r <= 6; r++) {
+        const slotW = (usableW - (c - 1) * G) / c;
+        const slotH = (usableH - (r - 1) * G) / r;
+
+        let w, h;
+        // Maintain EXACT aspect ratio without any stretching
+        if (slotW / slotH > aspect) {
+          h = slotH;
           w = h * aspect;
+        } else {
+          w = slotW;
+          h = w / aspect;
         }
-        candidates.push({
-          cols: c,
-          rows: r,
-          tw: w,
-          th: h,
-          total: c * r,
-          orient: p.orient,
-          pageW: p.pageW,
-          pageH: p.pageH,
-          M,
-          G,
-          score: w * h,
-        });
+
+        // Only keep readable, realistic ticket sizes
+        if (w >= 70 && h >= 25 && c * r <= 8) {
+          const area = c * r * w * h;
+          const fillRate = area / (usableW * usableH);
+          // Prefer standard concert ticket formats (c=1 with 3 or 4 rows, or c=2 with 3 rows)
+          let prefBonus = (c === 1 && (c * r === 3 || c * r === 4)) ? 0.15 : (c === 2 && c * r === 6 ? 0.1 : 0);
+          allLayouts.push({
+            cols: c,
+            rows: r,
+            tw: parseFloat(w.toFixed(1)),
+            th: parseFloat(h.toFixed(1)),
+            total: c * r,
+            orient: p.orient,
+            pageW: p.pageW,
+            pageH: p.pageH,
+            M,
+            G,
+            score: fillRate + prefBonus,
+          });
+        }
       }
     }
   }
 
-  if (candidates.length > 0) {
-    candidates.sort((a, b) => b.score - a.score);
-    return candidates[0];
+  // Sort layouts by optimal score descending
+  allLayouts.sort((a, b) => b.score - a.score);
+
+  if (choice === "auto") {
+    return allLayouts[0] || { cols: 1, rows: 4, tw: 180, th: 180 / aspect, total: 4, orient: "portrait", pageW: 210, pageH: 297, M, G };
   }
 
-  // Fallback to Full A4 Page
-  return {
-    cols: 1,
-    rows: 1,
-    tw: pageW,
-    th: pageH,
-    total: 1,
-    orient,
-    pageW,
-    pageH,
-    M: 0,
-    G: 0,
-    score: pageW * pageH,
-  };
+  // Handle single ticket centered
+  if (choice === "1") {
+    const p = aspect >= 1 ? pages[1] : pages[0];
+    const usableW = p.pageW - 2 * M;
+    const usableH = p.pageH - 2 * M;
+    let w, h;
+    if (usableW / usableH > aspect) {
+      h = usableH;
+      w = h * aspect;
+    } else {
+      w = usableW;
+      h = w / aspect;
+    }
+    return {
+      cols: 1,
+      rows: 1,
+      tw: parseFloat(w.toFixed(1)),
+      th: parseFloat(h.toFixed(1)),
+      total: 1,
+      orient: p.orient,
+      pageW: p.pageW,
+      pageH: p.pageH,
+      M,
+      G: 0,
+    };
+  }
+
+  const targetNum = parseInt(choice, 10);
+  const match = allLayouts.find((l) => l.total === targetNum);
+  return match || allLayouts[0] || { cols: 1, rows: 4, tw: 180, th: 180 / aspect, total: 4, orient: "portrait", pageW: 210, pageH: 297, M, G };
 }
 
 function uid() {
@@ -190,9 +194,9 @@ export default function TicketDesignerModal({ isOpen, onClose, tickets = [] }) {
   const [genProgress, setGenProgress] = useState(0);
   const [isGen, setIsGen] = useState(false);
 
-  // Default to 1 FULL A4 PAGE per ticket!
-  const [ticketsPerPage, setTicketsPerPage] = useState("1");
-  // Default code color (Black or White) for background-removed QR & Barcodes
+  // Density choice: "auto", "4", "3", "6", "2", "1"
+  const [ticketsPerPage, setTicketsPerPage] = useState("auto");
+  // Background-removed code color: "#000000" (black) or "#ffffff" (white)
   const [codeColor, setCodeColor] = useState("#000000");
 
   const areaRef = useRef(null);
@@ -210,7 +214,6 @@ export default function TicketDesignerModal({ isOpen, onClose, tickets = [] }) {
       return;
     }
 
-    // Clean up previous blob URL if exists
     if (tplSrc && tplSrc.startsWith("blob:")) {
       try { URL.revokeObjectURL(tplSrc); } catch {}
     }
@@ -257,7 +260,7 @@ export default function TicketDesignerModal({ isOpen, onClose, tickets = [] }) {
         x: 35,
         y: 35,
         w: isImg ? (type === "barcode" ? 35 : 22) : 32,
-        h: isImg ? (type === "barcode" ? 16 : 28) : 9,
+        h: isImg ? (type === "barcode" ? 18 : 28) : 10,
         textColor: "#ffffff",
       },
     ]);
@@ -395,10 +398,9 @@ export default function TicketDesignerModal({ isOpen, onClose, tickets = [] }) {
 
       setGenProgress(94);
 
-      // Build print HTML document with zero-margin Full A4 pages and transparent overlays
+      // Build print HTML document with natural ratio and transparent elements
       const { cols, rows, tw, th, total: perPage, orient, pageW, pageH, M, G } = layout;
       const pageCount = Math.ceil(data.length / perPage);
-      const isFullA4 = ticketsPerPage === "1";
       const allPages = [];
 
       for (let p = 0; p < pageCount; p++) {
@@ -433,18 +435,18 @@ export default function TicketDesignerModal({ isOpen, onClose, tickets = [] }) {
               }
             } else {
               // Background removed transparent text overlay
-              const fontSizeMm = Math.max(3.2, h * 0.55);
+              const fontSizeMm = Math.max(2.4, h * 0.52);
               overlays.push(`
-                <div style="position:absolute;left:${l.toFixed(2)}mm;top:${top.toFixed(2)}mm;width:${w.toFixed(2)}mm;height:${h.toFixed(2)}mm;display:flex;align-items:center;justify-content:center;font-size:${fontSizeMm.toFixed(2)}mm;font-weight:900;color:${ph.textColor || "#ffffff"};text-shadow:0 2px 4px rgba(0,0,0,0.8),0 0 2px rgba(0,0,0,0.9);text-align:center;overflow:hidden;line-height:1.15;word-break:break-word;font-family:'Segoe UI',Arial,sans-serif;background:transparent;">
+                <div style="position:absolute;left:${l.toFixed(2)}mm;top:${top.toFixed(2)}mm;width:${w.toFixed(2)}mm;height:${h.toFixed(2)}mm;display:flex;align-items:center;justify-content:center;font-size:${fontSizeMm.toFixed(2)}mm;font-weight:900;color:${ph.textColor || "#ffffff"};text-shadow:0 1.5px 3px rgba(0,0,0,0.8),0 0 2px rgba(0,0,0,0.9);text-align:center;overflow:hidden;line-height:1.15;word-break:break-word;font-family:'Segoe UI',Arial,sans-serif;background:transparent;">
                   ${escHTML(ticketValue(t, ph.type))}
                 </div>
               `);
             }
           }
 
-          // Each ticket card
+          // Individual ticket maintaining exact aspect ratio with dashed cutting guide
           pageCards.push(`
-            <div class="tk" style="position:relative;width:${tw.toFixed(2)}mm;height:${th.toFixed(2)}mm;overflow:hidden;box-sizing:border-box;">
+            <div class="tk" style="position:relative;width:${tw.toFixed(2)}mm;height:${th.toFixed(2)}mm;overflow:hidden;box-sizing:border-box;outline:1px dashed rgba(0,0,0,0.2);">
               <img src="${tplSrc}" class="tk-bg" style="position:absolute;left:0;top:0;width:100%;height:100%;object-fit:fill;z-index:1;display:block;" />
               <div class="tk-layer" style="position:absolute;left:0;top:0;width:100%;height:100%;z-index:2;">
                 ${overlays.join("")}
@@ -455,7 +457,9 @@ export default function TicketDesignerModal({ isOpen, onClose, tickets = [] }) {
 
         allPages.push(`
           <div class="pg">
-            ${pageCards.join("")}
+            <div class="grid">
+              ${pageCards.join("")}
+            </div>
           </div>
         `);
       }
@@ -466,7 +470,7 @@ export default function TicketDesignerModal({ isOpen, onClose, tickets = [] }) {
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>Enactus Event Tickets – Full A4 Print (${data.length} Tickets)</title>
+  <title>Enactus Event Tickets – Ready to Print (${data.length} Tickets)</title>
   <style>
     @page {
       size: ${orient === "landscape" ? "A4 landscape" : "A4 portrait"};
@@ -509,11 +513,23 @@ export default function TicketDesignerModal({ isOpen, onClose, tickets = [] }) {
       break-after: page;
       overflow: hidden;
       box-sizing: border-box;
-      ${isFullA4 ? "" : `display: grid; grid-template-columns: repeat(${cols}, ${tw.toFixed(2)}mm); grid-template-rows: repeat(${rows}, ${th.toFixed(2)}mm); gap: ${G}mm; align-content: start; justify-content: center; padding: ${M}mm;`}
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: ${M}mm;
     }
     .pg:last-child {
       page-break-after: auto;
       break-after: auto;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(${cols}, ${tw.toFixed(2)}mm);
+      grid-template-rows: repeat(${rows}, ${th.toFixed(2)}mm);
+      gap: ${G}mm;
+      align-content: center;
+      justify-content: center;
     }
     @media screen {
       body {
@@ -537,7 +553,7 @@ export default function TicketDesignerModal({ isOpen, onClose, tickets = [] }) {
         background: transparent !important;
         box-shadow: none !important;
         margin: 0 !important;
-        padding: 0 !important;
+        padding: ${M}mm !important;
         border-radius: 0 !important;
       }
     }
@@ -547,16 +563,16 @@ export default function TicketDesignerModal({ isOpen, onClose, tickets = [] }) {
   <div class="no-print">
     <div>
       <div style="font-weight:900;font-size:17px;color:#f59e0b;display:flex;align-items:center;gap:8px;">
-        <span>🖨️ Enactus Full A4 Ticket Print</span>
-        <span style="font-size:12px;background:#f59e0b20;color:#f59e0b;padding:2px 8px;border-radius:6px;border:1px solid #f59e0b40;">Full A4 ${orient}</span>
+        <span>🖨️ Enactus Ticket Batch Print</span>
+        <span style="font-size:12px;background:#f59e0b20;color:#f59e0b;padding:2px 8px;border-radius:6px;border:1px solid #f59e0b40;">A4 ${orient}</span>
       </div>
       <div style="font-size:12px;color:#94a3b8;margin-top:2px;">
-        <strong>${data.length} Tickets</strong> · Each ticket is a <strong>FULL A4 PAGE</strong> (${pageW}mm × ${pageH}mm) with background-removed QR & Barcodes
+        <strong>${data.length} Tickets</strong> across <strong>${pageCount} Sheet${pageCount !== 1 ? "s" : ""}</strong> (${perPage} per A4 page · Ticket size: ${Math.round(tw)}mm × ${Math.round(th)}mm · Perfect ratio)
       </div>
     </div>
     <div style="display:flex;gap:12px;">
       <button onclick="window.print()" style="padding:10px 24px;background:#f59e0b;color:#000000;font-weight:900;font-size:14px;border:none;border-radius:10px;cursor:pointer;box-shadow:0 2px 10px rgba(245,158,11,0.5);display:flex;align-items:center;gap:6px;">
-        <span>🖨️ Print Full A4 (or Save PDF)</span>
+        <span>🖨️ Print / Save PDF</span>
       </button>
       <button onclick="window.close()" style="padding:10px 18px;background:#27272a;color:#d4d4d8;font-weight:600;font-size:13px;border:1px solid #3f3f46;border-radius:10px;cursor:pointer;">
         ✕ Close
@@ -567,7 +583,7 @@ export default function TicketDesignerModal({ isOpen, onClose, tickets = [] }) {
   ${allPages.join("")}
 
   <script>
-    // Wait for high-res images to resolve before triggering print
+    // Wait for images to resolve before triggering print
     window.onload = function() {
       var imgs = Array.from(document.images);
       var promises = imgs.map(function(img) {
@@ -623,16 +639,16 @@ export default function TicketDesignerModal({ isOpen, onClose, tickets = [] }) {
             🖨️
           </div>
           <div>
-            <h2 className="text-xl sm:text-2xl font-black text-white">Full A4 Ticket Designer & Print</h2>
+            <h2 className="text-xl sm:text-2xl font-black text-white">A4 Ticket Sheet Designer</h2>
             <p className="text-xs text-neutral-400">
-              Full A4 ticket pages · Transparent QR & Barcode (background-removed) · Ready to print
+              Natural ticket aspect ratio · Background-removed QR & Barcode PNGs · Multiple tickets per A4
             </p>
           </div>
         </div>
 
         {/* Step Indicator */}
         <div className="flex items-center gap-1 px-5 mt-4 mb-1">
-          {["Upload PNG", "Position Placeholders", "Print Full A4"].map((l, i) => {
+          {["Upload PNG", "Position Placeholders", "Print A4 Sheet"].map((l, i) => {
             const n = i + 1;
             const active = step === n;
             const done = step > n;
@@ -657,7 +673,7 @@ export default function TicketDesignerModal({ isOpen, onClose, tickets = [] }) {
           })}
         </div>
         <div className="flex px-5 mb-3">
-          {["Upload PNG", "Position Placeholders", "Print Full A4"].map((l, i) => (
+          {["Upload PNG", "Position Placeholders", "Print A4 Sheet"].map((l, i) => (
             <div
               key={l}
               className={`flex-1 text-center text-[10px] font-semibold ${
@@ -688,7 +704,7 @@ export default function TicketDesignerModal({ isOpen, onClose, tickets = [] }) {
               <div className="text-6xl mb-4">🖼️</div>
               <h3 className="text-xl font-bold text-white mb-2">Upload Your Ticket Design (PNG / JPG)</h3>
               <p className="text-sm text-neutral-400 max-w-md mx-auto mb-5">
-                Drag and drop your ticket design image here. It will be scaled to cover the <strong>FULL A4 PAGE</strong>, with transparent QR codes, barcodes, and text.
+                Upload your design. The generator will calculate the <strong>perfect aspect ratio</strong> to arrange tickets neatly on standard A4 paper ready for cutting.
               </p>
               <div className="inline-flex items-center gap-2 px-6 py-3 bg-amber-500 hover:bg-amber-400 text-black font-extrabold rounded-xl text-sm transition shadow-lg">
                 📁 Choose Image File
@@ -765,7 +781,7 @@ export default function TicketDesignerModal({ isOpen, onClose, tickets = [] }) {
                           width: `${ph.w}%`,
                           height: `${ph.h}%`,
                           border: `2px ${isSel ? "solid" : "dashed"} ${ph.color}`,
-                          backgroundColor: `${ph.color}18`, // Soft transparent tint
+                          backgroundColor: `${ph.color}18`, // Transparent tint
                           borderRadius: 4,
                           zIndex: isSel ? 30 : 15,
                         }}
@@ -785,7 +801,7 @@ export default function TicketDesignerModal({ isOpen, onClose, tickets = [] }) {
                           }}
                         >
                           {ph.isImg ? (
-                            <span className="text-xs">{def?.icon} {ph.label} (Transparent)</span>
+                            <span className="text-xs">{def?.icon} {ph.label}</span>
                           ) : (
                             def?.sample || ph.label
                           )}
@@ -816,7 +832,7 @@ export default function TicketDesignerModal({ isOpen, onClose, tickets = [] }) {
                   })}
                 </div>
                 <p className="text-[11px] text-neutral-400 mt-2">
-                  💡 Drag boxes anywhere over your design. All QR codes, barcodes & text are 100% transparent PNGs with no background boxes!
+                  💡 Drag boxes to position. Drag corner handle to resize. All codes & text render as 100% transparent PNG overlays with no background box.
                 </p>
               </div>
 
@@ -884,34 +900,36 @@ export default function TicketDesignerModal({ isOpen, onClose, tickets = [] }) {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-neutral-900/80 border border-neutral-800 rounded-2xl p-4">
                 <div>
                   <label className="block text-xs font-bold text-neutral-300 uppercase tracking-wider mb-1.5">
-                    Page Layout Size
+                    Tickets Per A4 Page
                   </label>
                   <select
                     value={ticketsPerPage}
                     onChange={(e) => setTicketsPerPage(e.target.value)}
                     className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500 font-semibold"
                   >
-                    <option value="1">⭐ FULL A4 PAGE (1 Ticket = 1 Full Sheet)</option>
-                    <option value="2">2 per Page (Half Sheet)</option>
-                    <option value="4">4 per Page (Quarter Sheet)</option>
-                    <option value="6">6 per Page (Standard Badge)</option>
+                    <option value="auto">⭐ Auto Fit (Perfect Ratio & Best Paper Fill)</option>
+                    <option value="4">4 per Sheet (Standard 1×4 or 2×2)</option>
+                    <option value="3">3 per Sheet (Concert Voucher 1×3)</option>
+                    <option value="6">6 per Sheet (Compact Ticket 2×3)</option>
+                    <option value="2">2 per Sheet (Large Half Page)</option>
+                    <option value="1">1 per Sheet (Full Page Badge)</option>
                   </select>
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-neutral-300 uppercase tracking-wider mb-1.5">
-                    Print Summary
+                    Layout Summary
                   </label>
                   {layout ? (
                     <div className="bg-neutral-800/80 border border-neutral-700 rounded-xl px-3 py-2 text-xs flex items-center justify-between text-neutral-300">
                       <div>
                         <strong className="text-amber-400 font-black">
-                          {ticketsPerPage === "1" ? "FULL A4 PAGE" : `${layout.cols} × ${layout.rows}`}
+                          {layout.cols} × {layout.rows} = {layout.total}
                         </strong>{" "}
-                        ({layout.orient} · {layout.pageW}mm × {layout.pageH}mm)
+                        tickets / A4 sheet ({layout.orient})
                       </div>
                       <div className="text-[11px] text-neutral-400">
-                        {tickets.length} Attendees → <strong>{totalPages} Page{totalPages !== 1 ? "s" : ""}</strong>
+                        {Math.round(layout.tw)}mm × {Math.round(layout.th)}mm each
                       </div>
                     </div>
                   ) : (
@@ -919,6 +937,18 @@ export default function TicketDesignerModal({ isOpen, onClose, tickets = [] }) {
                   )}
                 </div>
               </div>
+
+              {/* Print Stats Strip */}
+              {layout && (
+                <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-2.5 text-xs flex items-center justify-between">
+                  <span className="text-neutral-300">
+                    Selected: <strong className="text-white">{tickets.length} attendees</strong>
+                  </span>
+                  <span className="text-amber-400 font-bold">
+                    Will print on {totalPages} A4 sheet{totalPages !== 1 ? "s" : ""} ({layout.total} tickets per page)
+                  </span>
+                </div>
+              )}
 
               {/* Action Buttons */}
               <div className="flex gap-3 pt-2">
@@ -938,7 +968,7 @@ export default function TicketDesignerModal({ isOpen, onClose, tickets = [] }) {
                   disabled={phs.length === 0 || tickets.length === 0}
                   className="flex-1 py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-extrabold rounded-xl text-sm transition-all shadow-xl active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  🖨️ Generate & Print {tickets.length} Full A4 Tickets
+                  🖨️ Generate & Print {tickets.length} Tickets ({totalPages} A4 Sheet{totalPages !== 1 ? "s" : ""})
                 </button>
               </div>
             </div>
@@ -949,12 +979,12 @@ export default function TicketDesignerModal({ isOpen, onClose, tickets = [] }) {
             <div className="text-center py-10 space-y-6">
               <div className="text-6xl animate-bounce">{isGen ? "⚙️" : "✅"}</div>
               <h3 className="text-xl font-bold text-white">
-                {isGen ? "Rendering High-Resolution Full A4 Tickets..." : "Print Window Opened!"}
+                {isGen ? "Rendering High-Resolution Ticket Sheets..." : "Print Window Opened!"}
               </h3>
               <p className="text-sm text-neutral-400 max-w-md mx-auto">
                 {isGen
-                  ? `Rendering ${tickets.length} full A4 pages with transparent QR codes and barcodes...`
-                  : "Your browser print window has opened. Each ticket is formatted as a full A4 page, ready to print or export as PDF."}
+                  ? `Rendering ${tickets.length} tickets across ${totalPages} A4 sheets at natural aspect ratio with transparent elements...`
+                  : "Your browser print window has opened. Each A4 sheet is formatted with natural ratio tickets and dashed cutting lines, ready to print or save as PDF."}
               </p>
 
               {/* Progress bar */}

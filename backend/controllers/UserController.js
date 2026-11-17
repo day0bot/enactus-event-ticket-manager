@@ -73,8 +73,12 @@ const userController = {
           .json({ message: "Email and password are required" });
       }
 
-      // Find the user by email
-      const user = await userModel.findOne({ email });
+      const cleanEmail = String(email).trim();
+
+      // Find the user by email (case-insensitive and trimmed)
+      const user = await userModel.findOne({
+        email: { $regex: new RegExp(`^${cleanEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&")}$`, "i") },
+      });
       if (!user) {
         return res.status(404).json({ message: "Email not found" });
       }
@@ -92,14 +96,17 @@ const userController = {
         { expiresIn: "3h" }
       );
 
-      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 30 minutes
-      const newSession = new Session({
-        userId: user._id,
-        token,
-        expiresAt,
-      });
-
-      await newSession.save();
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      try {
+        const newSession = new Session({
+          userId: user._id,
+          token,
+          expiresAt,
+        });
+        await newSession.save();
+      } catch (sessionErr) {
+        console.warn("Non-fatal session recording warning:", sessionErr.message);
+      }
 
       return res
         .cookie("token", token, {

@@ -81,101 +81,133 @@ function escHTML(s) {
 
 /**
  * Computes the PERFECT RATIO grid for tickets on standard A4 paper (210 x 297 mm)
+ * Supports high-density packing (e.g., 50 tickets/sheet to fit 300 tickets in 6 pages).
  * Preserves the exact, natural aspect ratio of the uploaded ticket design without any distortion.
  */
-function computeA4Layout(tw, th, choice = "auto") {
+function computeA4Layout(
+  tw,
+  th,
+  choice = "50",
+  totalTickets = 300,
+  customCols = 4,
+  customRows = 13,
+  orientChoice = "auto"
+) {
   const aspect = tw / th; // original natural width / height ratio
-  const M = 8; // 8mm page margin
-  const G = 4; // 4mm cutting gap between tickets
+  const M = 4; // 4mm page margin for high density
+  const G = 1.2; // 1.2mm cutting gap between tickets
 
   const pages = [
     { pageW: 210, pageH: 297, orient: "portrait" },
     { pageW: 297, pageH: 210, orient: "landscape" },
   ];
 
-  const allLayouts = [];
-
-  for (const p of pages) {
+  function getLayoutForGrid(c, r, p) {
     const usableW = p.pageW - 2 * M;
     const usableH = p.pageH - 2 * M;
+    const slotW = (usableW - (c - 1) * G) / c;
+    const slotH = (usableH - (r - 1) * G) / r;
 
-    // Test practical ticket grids (cols 1..3, rows 1..6)
-    for (let c = 1; c <= 3; c++) {
-      for (let r = 1; r <= 6; r++) {
-        const slotW = (usableW - (c - 1) * G) / c;
-        const slotH = (usableH - (r - 1) * G) / r;
+    let w, h;
+    // Maintain EXACT aspect ratio without any stretching
+    if (slotW / slotH > aspect) {
+      h = slotH;
+      w = h * aspect;
+    } else {
+      w = slotW;
+      h = w / aspect;
+    }
 
-        let w, h;
-        // Maintain EXACT aspect ratio without any stretching
-        if (slotW / slotH > aspect) {
-          h = slotH;
-          w = h * aspect;
-        } else {
-          w = slotW;
-          h = w / aspect;
-        }
+    const fillRate = (c * r * w * h) / (usableW * usableH);
+    return {
+      cols: c,
+      rows: r,
+      tw: parseFloat(w.toFixed(2)),
+      th: parseFloat(h.toFixed(2)),
+      total: c * r,
+      orient: p.orient,
+      pageW: p.pageW,
+      pageH: p.pageH,
+      M,
+      G,
+      fillRate,
+    };
+  }
 
-        // Only keep readable, realistic ticket sizes
-        if (w >= 70 && h >= 25 && c * r <= 8) {
-          const area = c * r * w * h;
-          const fillRate = area / (usableW * usableH);
-          // Prefer standard concert ticket formats (c=1 with 3 or 4 rows, or c=2 with 3 rows)
-          let prefBonus = (c === 1 && (c * r === 3 || c * r === 4)) ? 0.15 : (c === 2 && c * r === 6 ? 0.1 : 0);
-          allLayouts.push({
-            cols: c,
-            rows: r,
-            tw: parseFloat(w.toFixed(1)),
-            th: parseFloat(h.toFixed(1)),
-            total: c * r,
-            orient: p.orient,
-            pageW: p.pageW,
-            pageH: p.pageH,
-            M,
-            G,
-            score: fillRate + prefBonus,
-          });
+  const pList =
+    orientChoice === "portrait"
+      ? [pages[0]]
+      : orientChoice === "landscape"
+      ? [pages[1]]
+      : pages;
+
+  // Handle custom grid
+  if (choice === "custom") {
+    const c = Math.max(1, Math.min(12, parseInt(customCols, 10) || 4));
+    const r = Math.max(1, Math.min(25, parseInt(customRows, 10) || 13));
+    const layouts = pList.map((p) => getLayoutForGrid(c, r, p));
+    layouts.sort((a, b) => b.fillRate - a.fillRate);
+    return layouts[0];
+  }
+
+  // Handle single ticket centered
+  if (choice === "1") {
+    const p = orientChoice !== "auto" ? pList[0] : (aspect >= 1.2 ? pages[1] : pages[0]);
+    return getLayoutForGrid(1, 1, p);
+  }
+
+  // Determine target ticket count per page
+  let target = 50;
+  if (choice === "auto") {
+    target = totalTickets >= 100 ? 50 : totalTickets >= 40 ? 20 : totalTickets >= 12 ? 12 : 4;
+  } else {
+    target = parseInt(choice, 10) || 50;
+  }
+
+  // Test practical grids from 1 to 10 columns and 1 to 25 rows
+  const candidates = [];
+  for (const p of pList) {
+    for (let c = 1; c <= 10; c++) {
+      for (let r = 1; r <= 25; r++) {
+        const total = c * r;
+        // Accept grids close to target
+        if (total >= target && total <= Math.max(target + 4, Math.round(target * 1.15))) {
+          candidates.push(getLayoutForGrid(c, r, p));
         }
       }
     }
   }
 
-  // Sort layouts by optimal score descending
-  allLayouts.sort((a, b) => b.score - a.score);
-
-  if (choice === "auto") {
-    return allLayouts[0] || { cols: 1, rows: 4, tw: 180, th: 180 / aspect, total: 4, orient: "portrait", pageW: 210, pageH: 297, M, G };
-  }
-
-  // Handle single ticket centered
-  if (choice === "1") {
-    const p = aspect >= 1 ? pages[1] : pages[0];
-    const usableW = p.pageW - 2 * M;
-    const usableH = p.pageH - 2 * M;
-    let w, h;
-    if (usableW / usableH > aspect) {
-      h = usableH;
-      w = h * aspect;
-    } else {
-      w = usableW;
-      h = w / aspect;
+  // Prefer high fill rate among close candidate grids
+  candidates.sort((a, b) => {
+    const closeA = Math.abs(a.total - target) <= 4;
+    const closeB = Math.abs(b.total - target) <= 4;
+    if (closeA && closeB) {
+      return b.fillRate - a.fillRate;
     }
-    return {
-      cols: 1,
-      rows: 1,
-      tw: parseFloat(w.toFixed(1)),
-      th: parseFloat(h.toFixed(1)),
-      total: 1,
-      orient: p.orient,
-      pageW: p.pageW,
-      pageH: p.pageH,
-      M,
-      G: 0,
-    };
+    return Math.abs(a.total - target) - Math.abs(b.total - target);
+  });
+
+  if (candidates.length > 0) {
+    return candidates[0];
   }
 
-  const targetNum = parseInt(choice, 10);
-  const match = allLayouts.find((l) => l.total === targetNum);
-  return match || allLayouts[0] || { cols: 1, rows: 4, tw: 180, th: 180 / aspect, total: 4, orient: "portrait", pageW: 210, pageH: 297, M, G };
+  // Fallback: pick the grid closest to target
+  let best = null;
+  let minDiff = Infinity;
+  for (const p of pList) {
+    for (let c = 1; c <= 10; c++) {
+      for (let r = 1; r <= 25; r++) {
+        const total = c * r;
+        const diff = Math.abs(total - target);
+        if (diff < minDiff) {
+          minDiff = diff;
+          best = getLayoutForGrid(c, r, p);
+        }
+      }
+    }
+  }
+  return best || getLayoutForGrid(4, 13, pList[0]);
 }
 
 function uid() {
@@ -194,8 +226,12 @@ export default function TicketDesignerModal({ isOpen, onClose, tickets = [] }) {
   const [genProgress, setGenProgress] = useState(0);
   const [isGen, setIsGen] = useState(false);
 
-  // Density choice: "auto", "4", "3", "6", "2", "1"
-  const [ticketsPerPage, setTicketsPerPage] = useState("auto");
+  // Density choice: "50", "40", "30", "20", "16", "12", "8", "4", "target_pages", "custom"
+  const [ticketsPerPage, setTicketsPerPage] = useState(tickets.length >= 60 ? "50" : (tickets.length >= 25 ? "20" : "50"));
+  const [targetPages, setTargetPages] = useState(6);
+  const [customCols, setCustomCols] = useState(4);
+  const [customRows, setCustomRows] = useState(13);
+  const [pageOrient, setPageOrient] = useState("auto"); // "auto", "portrait", "landscape"
   // Background-removed code color: "#000000" (black) or "#ffffff" (white)
   const [codeColor, setCodeColor] = useState("#000000");
 
@@ -361,7 +397,23 @@ export default function TicketDesignerModal({ isOpen, onClose, tickets = [] }) {
   }, [drag, resize]);
 
   /* ── Layout Computation ──────────────────────────────────── */
-  const layout = tplSize.w > 0 ? computeA4Layout(tplSize.w, tplSize.h, ticketsPerPage) : null;
+  const effectiveChoice =
+    ticketsPerPage === "target_pages"
+      ? String(Math.max(1, Math.ceil(tickets.length / (parseInt(targetPages, 10) || 6))))
+      : ticketsPerPage;
+
+  const layout =
+    tplSize.w > 0
+      ? computeA4Layout(
+          tplSize.w,
+          tplSize.h,
+          effectiveChoice,
+          tickets.length,
+          customCols,
+          customRows,
+          pageOrient
+        )
+      : null;
   const totalPages = layout ? Math.ceil(tickets.length / layout.total) : 0;
 
   /* ── Generate & Trigger Print ────────────────────────────── */
@@ -435,9 +487,9 @@ export default function TicketDesignerModal({ isOpen, onClose, tickets = [] }) {
               }
             } else {
               // Background removed transparent text overlay
-              const fontSizeMm = Math.max(2.4, h * 0.52);
+              const fontSizeMm = Math.max(1.8, Math.min(3.4, h * 0.55));
               overlays.push(`
-                <div style="position:absolute;left:${l.toFixed(2)}mm;top:${top.toFixed(2)}mm;width:${w.toFixed(2)}mm;height:${h.toFixed(2)}mm;display:flex;align-items:center;justify-content:center;font-size:${fontSizeMm.toFixed(2)}mm;font-weight:900;color:${ph.textColor || "#ffffff"};text-shadow:0 1.5px 3px rgba(0,0,0,0.8),0 0 2px rgba(0,0,0,0.9);text-align:center;overflow:hidden;line-height:1.15;word-break:break-word;font-family:'Segoe UI',Arial,sans-serif;background:transparent;">
+                <div style="position:absolute;left:${l.toFixed(2)}mm;top:${top.toFixed(2)}mm;width:${w.toFixed(2)}mm;height:${h.toFixed(2)}mm;display:flex;align-items:center;justify-content:center;font-size:${fontSizeMm.toFixed(2)}mm;font-weight:900;color:${ph.textColor || "#ffffff"};text-shadow:0 1px 2px rgba(0,0,0,0.8),0 0 2px rgba(0,0,0,0.9);text-align:center;overflow:hidden;line-height:1.1;white-space:nowrap;text-overflow:ellipsis;font-family:'Segoe UI',Arial,sans-serif;background:transparent;">
                   ${escHTML(ticketValue(t, ph.type))}
                 </div>
               `);
@@ -446,8 +498,8 @@ export default function TicketDesignerModal({ isOpen, onClose, tickets = [] }) {
 
           // Individual ticket maintaining exact aspect ratio with dashed cutting guide
           pageCards.push(`
-            <div class="tk" style="position:relative;width:${tw.toFixed(2)}mm;height:${th.toFixed(2)}mm;overflow:hidden;box-sizing:border-box;outline:1px dashed rgba(0,0,0,0.2);">
-              <img src="${tplSrc}" class="tk-bg" style="position:absolute;left:0;top:0;width:100%;height:100%;object-fit:fill;z-index:1;display:block;" />
+            <div class="tk" style="position:relative;width:${tw.toFixed(2)}mm;height:${th.toFixed(2)}mm;overflow:hidden;box-sizing:border-box;outline:1px dashed rgba(0,0,0,0.22);">
+              ${tplSrc ? `<img src="${tplSrc}" class="tk-bg" style="position:absolute;left:0;top:0;width:100%;height:100%;object-fit:fill;z-index:1;display:block;" />` : `<div style="position:absolute;inset:0;background:#ffffff;"></div>`}
               <div class="tk-layer" style="position:absolute;left:0;top:0;width:100%;height:100%;z-index:2;">
                 ${overlays.join("")}
               </div>
@@ -603,13 +655,36 @@ export default function TicketDesignerModal({ isOpen, onClose, tickets = [] }) {
 
       setGenProgress(100);
 
-      const printWin = window.open("", "_blank");
-      if (printWin) {
-        printWin.document.open();
-        printWin.document.write(printDocHtml);
-        printWin.document.close();
-      } else {
-        toast.warning("Pop-up was blocked. Please allow pop-ups for this site so the print window can open.");
+      let opened = false;
+      try {
+        const printWin = window.open("", "_blank");
+        if (printWin) {
+          printWin.document.open();
+          printWin.document.write(printDocHtml);
+          printWin.document.close();
+          opened = true;
+        }
+      } catch (e) {
+        console.warn("window.open failed:", e);
+      }
+
+      if (!opened) {
+        let iframe = document.getElementById("print-ticket-frame");
+        if (!iframe) {
+          iframe = document.createElement("iframe");
+          iframe.id = "print-ticket-frame";
+          iframe.style.position = "fixed";
+          iframe.style.right = "0";
+          iframe.style.bottom = "0";
+          iframe.style.width = "0";
+          iframe.style.height = "0";
+          iframe.style.border = "none";
+          document.body.appendChild(iframe);
+        }
+        iframe.contentDocument.open();
+        iframe.contentDocument.write(printDocHtml);
+        iframe.contentDocument.close();
+        toast.info("Opening print dialog directly in page...");
       }
     } catch (err) {
       console.error("Print generation error:", err);
@@ -897,58 +972,146 @@ export default function TicketDesignerModal({ isOpen, onClose, tickets = [] }) {
               </div>
 
               {/* Page Format & Layout Controls */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-neutral-900/80 border border-neutral-800 rounded-2xl p-4">
-                <div>
-                  <label className="block text-xs font-bold text-neutral-300 uppercase tracking-wider mb-1.5">
-                    Tickets Per A4 Page
-                  </label>
-                  <select
-                    value={ticketsPerPage}
-                    onChange={(e) => setTicketsPerPage(e.target.value)}
-                    className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500 font-semibold"
-                  >
-                    <option value="auto">⭐ Auto Fit (Perfect Ratio & Best Paper Fill)</option>
-                    <option value="4">4 per Sheet (Standard 1×4 or 2×2)</option>
-                    <option value="3">3 per Sheet (Concert Voucher 1×3)</option>
-                    <option value="6">6 per Sheet (Compact Ticket 2×3)</option>
-                    <option value="2">2 per Sheet (Large Half Page)</option>
-                    <option value="1">1 per Sheet (Full Page Badge)</option>
-                  </select>
+              <div className="bg-neutral-900/80 border border-neutral-800 rounded-2xl p-4 space-y-3.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                      <span>Tickets Per A4 Page</span>
+                      <span className="text-[10px] text-amber-400 font-normal">
+                        {ticketsPerPage === "50" ? "🔥 6 Pages for 300" : ""}
+                      </span>
+                    </label>
+                    <select
+                      value={ticketsPerPage}
+                      onChange={(e) => setTicketsPerPage(e.target.value)}
+                      className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500 font-semibold"
+                    >
+                      <option value="50">⚡ 50 per Sheet (Fit 300 in 6 Pages - Ultra Paper Saver)</option>
+                      <option value="40">40 per Sheet (Fit 300 in 8 Pages)</option>
+                      <option value="30">30 per Sheet (Fit 300 in 10 Pages)</option>
+                      <option value="20">20 per Sheet (Fit 300 in 15 Pages)</option>
+                      <option value="16">16 per Sheet (Fit 300 in 19 Pages - High Density)</option>
+                      <option value="12">12 per Sheet (Fit 300 in 25 Pages - Medium Density)</option>
+                      <option value="8">8 per Sheet (Fit 300 in 38 Pages - Large Tickets)</option>
+                      <option value="6">6 per Sheet (Fit 300 in 50 Pages)</option>
+                      <option value="4">4 per Sheet (Fit 300 in 75 Pages - Extra Large)</option>
+                      <option value="1">1 per Sheet (Full Page Badge / Sign)</option>
+                      <option value="target_pages">🎯 Target Page Count (e.g. 6 Sheets)</option>
+                      <option value="custom">🛠️ Custom Grid (Set Columns & Rows)</option>
+                      <option value="auto">⭐ Auto Best Paper Fill</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-300 uppercase tracking-wider mb-1.5">
+                      Paper Orientation
+                    </label>
+                    <div className="flex gap-2">
+                      {[
+                        { id: "auto", label: "Auto Fit" },
+                        { id: "portrait", label: "Portrait 📄" },
+                        { id: "landscape", label: "Landscape 📃" },
+                      ].map((o) => (
+                        <button
+                          key={o.id}
+                          type="button"
+                          onClick={() => setPageOrient(o.id)}
+                          className={`flex-1 py-2 px-2 text-xs font-bold rounded-xl border transition ${
+                            pageOrient === o.id
+                              ? "bg-amber-500/20 text-amber-300 border-amber-500/60 shadow-sm"
+                              : "bg-neutral-800 text-neutral-400 border-neutral-700 hover:text-white"
+                          }`}
+                        >
+                          {o.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-neutral-300 uppercase tracking-wider mb-1.5">
-                    Layout Summary
-                  </label>
-                  {layout ? (
-                    <div className="bg-neutral-800/80 border border-neutral-700 rounded-xl px-3 py-2 text-xs flex items-center justify-between text-neutral-300">
+                {/* Sub-controls if Target Pages chosen */}
+                {ticketsPerPage === "target_pages" && (
+                  <div className="bg-neutral-800/60 border border-neutral-700/60 rounded-xl p-3 flex flex-col sm:flex-row items-center gap-3">
+                    <div className="w-full sm:w-auto">
+                      <label className="block text-[11px] font-bold text-neutral-300 uppercase tracking-wider mb-1">
+                        Desired Total A4 Sheets:
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={targetPages}
+                        onChange={(e) => setTargetPages(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                        className="w-28 bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-1.5 text-sm font-bold text-amber-400 focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+                    <div className="text-xs text-neutral-400">
+                      💡 With <strong>{tickets.length} tickets</strong> targetting <strong>{targetPages} sheets</strong>, each A4 page will hold approximately <strong>{Math.ceil(tickets.length / (parseInt(targetPages, 10) || 6))} tickets</strong>.
+                    </div>
+                  </div>
+                )}
+
+                {/* Sub-controls if Custom Grid chosen */}
+                {ticketsPerPage === "custom" && (
+                  <div className="bg-neutral-800/60 border border-neutral-700/60 rounded-xl p-3 flex flex-wrap items-center gap-4">
+                    <div>
+                      <label className="block text-[11px] font-bold text-neutral-300 uppercase tracking-wider mb-1">
+                        Columns (across):
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="12"
+                        value={customCols}
+                        onChange={(e) => setCustomCols(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                        className="w-24 bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-1.5 text-sm font-bold text-amber-400 focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-neutral-300 uppercase tracking-wider mb-1">
+                        Rows (down):
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="25"
+                        value={customRows}
+                        onChange={(e) => setCustomRows(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                        className="w-24 bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-1.5 text-sm font-bold text-amber-400 focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+                    <div className="text-xs text-neutral-400">
+                      = <strong>{customCols * customRows} tickets</strong> per A4 sheet ({customCols} cols × {customRows} rows)
+                    </div>
+                  </div>
+                )}
+
+                {/* Live Layout Summary & Paper Savings Banner */}
+                {layout && (
+                  <div className="bg-gradient-to-r from-amber-500/15 via-orange-500/15 to-amber-500/10 border border-amber-500/40 rounded-xl p-3 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-inner">
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-2xl">📄</span>
                       <div>
-                        <strong className="text-amber-400 font-black">
-                          {layout.cols} × {layout.rows} = {layout.total}
-                        </strong>{" "}
-                        tickets / A4 sheet ({layout.orient})
-                      </div>
-                      <div className="text-[11px] text-neutral-400">
-                        {Math.round(layout.tw)}mm × {Math.round(layout.th)}mm each
+                        <div className="text-white font-black text-sm flex items-center gap-2">
+                          <span>{tickets.length} Tickets → {totalPages} A4 Sheet{totalPages !== 1 ? "s" : ""}</span>
+                          <span className="bg-amber-400 text-black text-[11px] font-black px-2 py-0.5 rounded-full">
+                            {layout.total} / page
+                          </span>
+                        </div>
+                        <div className="text-neutral-400 text-[11px] mt-0.5">
+                          Grid: <strong>{layout.cols} cols × {layout.rows} rows</strong> · Ticket: <strong>{Math.round(layout.tw)}mm × {Math.round(layout.th)}mm</strong> ({layout.orient})
+                        </div>
                       </div>
                     </div>
-                  ) : (
-                    <div className="text-xs text-neutral-500">Calculating layout...</div>
-                  )}
-                </div>
+                    {tickets.length >= 20 && totalPages < Math.ceil(tickets.length / 4) && (
+                      <div className="text-emerald-400 font-extrabold text-[11px] bg-emerald-500/15 border border-emerald-500/30 px-3 py-1.5 rounded-lg flex items-center gap-1.5 self-start sm:self-auto">
+                        <span>🌱</span>
+                        <span>Saved {Math.ceil(tickets.length / 4) - totalPages} A4 sheets vs 4/page!</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-
-              {/* Print Stats Strip */}
-              {layout && (
-                <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-2.5 text-xs flex items-center justify-between">
-                  <span className="text-neutral-300">
-                    Selected: <strong className="text-white">{tickets.length} attendees</strong>
-                  </span>
-                  <span className="text-amber-400 font-bold">
-                    Will print on {totalPages} A4 sheet{totalPages !== 1 ? "s" : ""} ({layout.total} tickets per page)
-                  </span>
-                </div>
-              )}
 
               {/* Action Buttons */}
               <div className="flex gap-3 pt-2">
